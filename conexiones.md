@@ -8,7 +8,7 @@
 | Servicio | Para qué | Auth (env var) | Endpoint base | Notas |
 |---|---|---|---|---|
 | **Mercado Pago** | cobrar el lavado (Checkout Pro: se crea una *preference*, el cliente paga, MP avisa por webhook) | `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_PUBLIC_KEY`, `MERCADOPAGO_WEBHOOK_SECRET` | SDK oficial `mercadopago` v2 | Hoy `PAYMENT_PROVIDER=demo` (sin credenciales). **La seguridad no depende del webhook: siempre se re-consulta el pago al API de MP.** SPIKE con credenciales de prueba pendiente. |
-| **ESP32 (dispositivo)** | heartbeat, buscar autorización, avisar pulsador/fin/interrupción | secret **por dispositivo** (AES-256-GCM en base, clave derivada de `DEVICE_AUTH_SECRET`) | `POST/GET /api/device/*` sobre HTTPS | **El ESP32 siempre inicia la conexión; el backend nunca lo llama.** HMAC-SHA256 por request con ventana de ±5 min. Rotar el secret de HIDRO-01 no afecta a HIDRO-02. |
+| **ESP32 (dispositivo)** | heartbeat, buscar autorización, avisar pulsador/fin/interrupción | secret **por dispositivo** (AES-256-GCM en base, clave derivada de `DEVICE_AUTH_SECRET`) | `https://hidro-api.insolvadev.com/api/device/*` | **El ESP32 siempre inicia la conexión; el backend nunca lo llama.** HMAC-SHA256 por request con ventana de ±5 min. Rotar el secret de HIDRO-01 no afecta a HIDRO-02. **TLS: el firmware pinnea un bundle de 2 raíces** (GTS Root R4 del server detrás de Cloudflare + ISRG Root X1 de la nube), verificado `Verify return code: 0 (ok)` contra el dominio real — con una sola raíz la mudanza a producción rompe el TLS (ADR-016/021). |
 | **Postgres** | datos | `DATABASE_URL` | — | Si está vacío corre **PGlite** (Postgres 16 embebido en el proceso, persiste en `DB_FILE`). Eso es DEMO: en producción va un Postgres real. |
 
 ## Flujos n8n
@@ -26,6 +26,12 @@ Ninguno. Este Mundo no usa n8n.
 ## Sin API → Playwright
 No aplica. La verificación visual se hace con `scripts/browser-e2e.mjs` (Edge headless) contra el
 propio front, no contra herramientas de terceros.
+
+## Endpoint público
+**`https://hidro-api.insolvadev.com`** — hostname FIJO (ADR-020/021). Hoy resuelve al server local de
+Pablo por el túnel de Cloudflare (`frigate-nvr`, ingress → `http://localhost:80` → Traefik de Coolify);
+cuando el sistema pase a producción se re-apunta el DNS y **el ESP32 no se toca**. Pasos de deploy en
+`docs/deploy-coolify.md`. ⚠️ `TRUST_PROXY` sin verificar con 3 proxies delante (ADR-022).
 
 ## Hardware (conexión física — este Mundo es el único que la tiene)
 | Componente | Rol | Config |
