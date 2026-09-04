@@ -4,7 +4,7 @@
 > Última actualización: 2026-09-04
 
 ## Dónde estamos
-Código y memoria juntos acá (ADR-012), repo propio **privado**, HEAD `275c9a5` pusheado. El firmware
+Código y memoria juntos acá (ADR-012), repo propio **privado**, HEAD `350bcb3` pusheado (5 commits hoy). El firmware
 **compila** y el Build lo hace Claude (ADR-008). **El software está tan avanzado como puede estar sin
 hardware, sin app desplegada y sin las respuestas del dueño.**
 
@@ -39,6 +39,12 @@ hardware, sin app desplegada y sin las respuestas del dueño.**
 - El firmware compila pero **nunca corrió en hardware**. `[STOP-HUMANO]`.
 - Config del firmware toda de compilación (NVS solo guarda sesión): si cambia el WiFi de la
   cooperativa, hay que abrir la caja. Deuda, se decide en la Fase 1.
+
+## Lo que decidió esta sesión (2026-09-04) — ADR-014 a 024
+Reparto de trabajo (Pablo software+firmware, técnicos hardware) · hardware objetivo fijado ·
+server local = desarrollo, nube = producción · hostname fijo y mudanza por DNS · Vercel descartado
+para la API · MP con cuenta de prueba primero · infra de red montada y TLS resuelto · y **dos
+hallazgos de dinero encontrados auditando por ejecución** (ADR-023 y 024).
 
 ## Próximo paso concreto
 1. **[HUMANO]** Crear la app en Coolify → `docs/deploy-coolify.md`. Es lo único que falta para tener
