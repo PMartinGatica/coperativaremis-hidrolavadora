@@ -64,3 +64,23 @@ ustedes. Todavía no, primero pruebo todo con una cuenta de prueba, pero te lo a
 lo tengas en el radar y veas quién lo maneja de ese lado.
 
 Con esas tres respuestas sigo. Cualquier cosa te llamo y lo charlamos.
+
+---
+
+# AGREGADO (2026-09-04, después de mandar el mensaje de arriba)
+
+> Surgió del ADR-024: el crédito que le ofrecimos en el punto 2 **no se puede usar** si el lavado
+> fallido ya le quemó el cupo del día. Es una línea, pero sin ella la compensación es de mentira.
+> Mandar como mensaje aparte, después de que conteste lo otro (o junto, si todavía no contestó).
+
+---
+
+Ah, me olvidé un detalle del punto 2 y es importante.
+
+Hoy el sistema cuenta el lavado contra el límite de 2 por día **aunque el lavado haya fallado**. O
+sea que si se corta la luz en la mitad, además de perder el lavado, le gasta uno de los dos que tenía.
+Con lo cual el "crédito para la próxima" no le sirve de nada: ya no le quedan lavados ese día.
+
+Lo puedo cambiar para que un lavado que falló por culpa nuestra (corte de luz, máquina caída) **no le
+cuente contra el límite**. Me parece que es lo lógico, pero es tu decisión porque afecta al control
+de la tarifa de $500. ¿Lo dejo así?
