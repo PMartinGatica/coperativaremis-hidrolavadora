@@ -307,3 +307,25 @@
   puede llegar al pago real sin el webhook. **No se implementa nada todavía**: es alcance de la Fase
   1 y la fase abre con `/office-hours` + `/autoplan`, como manda la regla. Borrador en
   `fases/FASE-1.md`.
+
+- **2026-09-04 — ADR-024 [HALLAZGO + queda ATADO a la respuesta del dueño]: el límite diario le cobra
+  al cliente las fallas del sistema.** Verificado ejecutando contra `packages/shared/dist`:
+  `WASH_COUNTING_STATUSES` incluye `SESSION_INTERRUPTED`, `MACHINE_OFFLINE`, `DEVICE_ERROR`,
+  `EMERGENCY_STOP` y `AUTHORIZATION_EXPIRED`. O sea que si se corta la luz en la mitad del lavado, o
+  si la máquina estaba caída, **el cliente igual gasta uno de sus 2 lavados del día**.
+  **Buena noticia que hay que dejar escrita para que nadie la re-investigue:** `PAYMENT_EXPIRED` y
+  `PAYMENT_FAILED` **NO** cuentan. Se chequeó específicamente si el falso vencimiento del ADR-023 se
+  componía con esto — **no se compone**. La hipótesis era razonable y resultó falsa; se verificó en
+  vez de afirmarla.
+  **Lo que sí es un problema hoy:** `PAYMENT_PENDING` **cuenta**. Como anti-abuso tiene sentido (que
+  nadie abra 50 sesiones), pero combinado con los 120 s del ADR-023 significa que un cliente que
+  trastabilla — arranca, se le cierra la app por la señal, vuelve a escanear — llega al límite de 2
+  **sin haber lavado ni una vez**, y queda bloqueado hasta 2 minutos. Se auto-cura al vencer, pero el
+  cliente ve "ya lavaste 2 veces hoy" cuando no lavó ninguna.
+  **Por qué queda atado al dueño:** el mensaje que se le mandó ofrece *"crédito automático: la próxima
+  vez que escanee, lava gratis"* si se corta la luz. **Ese crédito es inservible si el lavado fallido
+  ya le quemó el cupo del día.** Las dos decisiones — reembolso y contabilidad del límite — hay que
+  tomarlas juntas o la compensación no se puede usar. Si contesta "crédito automático",
+  `SESSION_INTERRUPTED` y `MACHINE_OFFLINE` tienen que salir de `WASH_COUNTING_STATUSES`.
+  **No se cambia nada todavía**: entra al alcance de la Fase 1, con la respuesta del dueño como
+  entrada.

@@ -30,6 +30,11 @@ hardware, sin app desplegada y sin las respuestas del dueño.**
   que el motor **arranque solo en el boot**. Probar polaridad en banco, sin contactor.
 - **ADR-022:** 3 proxies delante; `TRUST_PROXY=1` puede agrupar a todos los clientes en una cuota de
   rate limit. Verificar con la app desplegada.
+- **ADR-024:** el límite diario le cobra al cliente las fallas del sistema (`SESSION_INTERRUPTED`,
+  `MACHINE_OFFLINE` cuentan), y `PAYMENT_PENDING` cuenta, así que un cliente que trastabilla se
+  bloquea solo hasta 2 min sin haber lavado. **Atado a la respuesta del dueño:** el "crédito
+  automático" que se le ofreció es inservible si el lavado fallido ya quemó el cupo. Verificado que
+  `PAYMENT_EXPIRED` **no** cuenta, o sea que NO se compone con el ADR-023.
 - `getPayment()` devuelve `PENDING` hardcodeado (trampa cargada); `refundPayment()` es stub.
 - El firmware compila pero **nunca corrió en hardware**. `[STOP-HUMANO]`.
 - Config del firmware toda de compilación (NVS solo guarda sesión): si cambia el WiFi de la

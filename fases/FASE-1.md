@@ -60,6 +60,12 @@ llegar al pago real sin el webhook**. La pieza existe; falta usarla.
 - Arreglar o eliminar `getPayment()` para que deje de ser una trampa.
 - `TRUST_PROXY` / `CF-Connecting-IP` (ADR-022): entra acá porque también es "el sistema se equivoca
   sobre quién es el cliente", y se verifica con la app ya desplegada.
+- **Contabilidad del límite diario (ADR-024).** `PAYMENT_PENDING` cuenta, así que un cliente que
+  trastabilla se bloquea a sí mismo hasta 2 minutos sin haber lavado. Y `SESSION_INTERRUPTED` /
+  `MACHINE_OFFLINE` cuentan, o sea que el cliente paga con su cupo las fallas del sistema.
+  **Depende de la respuesta del dueño sobre reembolsos:** si elige "crédito automático", ese crédito
+  es inservible mientras el lavado fallido siga quemando el cupo del día. Las dos decisiones se
+  toman juntas.
 
 ## No entra (obligatorio y específico)
 - **Reembolsos.** `refundPayment()` sigue siendo stub hasta que el dueño defina la política. Esta
