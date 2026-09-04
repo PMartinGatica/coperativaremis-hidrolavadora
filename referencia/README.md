@@ -1,10 +1,10 @@
 # referencia/ — material pesado del Mundo
 
-> **En este Mundo esta carpeta está vacía a propósito.** El material de referencia vive en el
-> **repo de código**, no acá (ver ADR-004 del Mundo).
+> **Esta carpeta está vacía a propósito.** El material de referencia pesado vive en la raíz del
+> Mundo junto al código, no acá.
 
 ## Dónde está el material pesado
-Todo en `D:/insolva/Desarrollo/Deepseek-harnes/hidro-self-service/`:
+Todo en la raíz de esta misma carpeta:
 
 | Archivo | Qué es | Tamaño |
 |---|---|---|

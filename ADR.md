@@ -115,3 +115,26 @@
   `npm run build:firmware` (`pio run -d firmware/esp32`, la puerta real) y `npm run check:firmware`
   (el chequeo estático de `scripts/check-firmware.mjs`, que estaba huérfano y ahora es invocable
   como pre-chequeo barato — **no reemplaza a `pio run`**, ver ADR-009).
+
+- **2026-09-04 — ADR-012: el código se consolida en `Madre/mundos/hidro-self-service/`. SUPERSEDE
+  el ADR-004.** El repo pasó de `Deepseek-harnes/hidro-self-service/` a la carpeta del Mundo, y
+  memoria y código conviven acá, igual que en los otros 4 Mundos. Repo propio:
+  **https://github.com/PMartinGatica/coperativaremis-hidrolavadora** (privado). Motivo: el ADR-004
+  justificaba la separación porque el sistema lo construía DeepSeek en su harness; con el Build ya
+  propio (ADR-008) esa razón desapareció, y mantenerla costaba una regla de "dos raíces" en el
+  CLAUDE.md y el MAPA que era un footgun permanente (búsquedas acotadas apuntando a otra carpeta).
+  Evidencia que cerró la decisión: `Madre/.gitignore` tiene `/mundos/`, y los 4 Mundos anteriores
+  ya viven adentro con repo y remote propios — `hidro` era el único afuera. Cero colisiones de
+  nombre entre memoria y código. **La regla del slug NO cambia:** tener `.git`+remote propio no
+  alcanza, `gstack-slug` camina al ancestro más externo y `Madre/` gana igual (verificado: sin el
+  override resuelve a `PMartinGatica-madreinsolva`), así que `GSTACK_PROJECT_SLUG` se sigue
+  exportando a mano. Nota de la mudanza: `apps/web/node_modules` y `apps/web/dist` no se movieron
+  (los tenía tomados un `esbuild` colgado de una corrida vieja de vitest); se regeneraron con
+  `npm install`, que es lo correcto — son artefactos, no fuente.
+
+- **2026-09-04 — ADR-013: primer commit y push.** `bc5f744`, 138 archivos, 21.966 líneas, rama
+  `main`. Cierra la deuda #1 del Mundo (ADR-010): a partir de acá hay historial y rollback en un
+  sistema que cobra plata y enciende un motor de 10 HP. El repo es **privado**, lo cual importa
+  porque adentro viajan `presupuesto-hidrolavadora-completo.html` (la cotización al cliente),
+  `contexto.md` (datos del negocio) y el ADR-007 (que documenta un agujero explotable de tarifa).
+  **Si alguna vez se hace público, sacar esos tres antes.**

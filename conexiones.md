@@ -2,8 +2,7 @@
 
 > **PASO 2 de la receta — Conexiones.** Cómo este Mundo habla con el mundo exterior.
 > Regla: si una herramienta tiene API, se usa la API. Credenciales nunca en claro: van en `.env`
-> (no commiteado) y se documentan en `.env.example` (que vive en la raíz del **repo de código**,
-> `Deepseek-harnes/hidro-self-service/.env.example`).
+> (no commiteado) y se documentan en `.env.example`, en la raíz de esta carpeta.
 
 ## APIs / servicios
 | Servicio | Para qué | Auth (env var) | Endpoint base | Notas |
@@ -41,11 +40,13 @@ propio front, no contra herramientas de terceros.
 > `[STOP-HUMANO]`: el primer encendido del relay con el motor conectado se hace con Pablo presente
 > y con el timer eléctrico viejo todavía instalado como red.
 
-## .env.example (vive en el repo de código — resumen de lo importante)
+## .env.example (en la raíz del Mundo — resumen de lo importante)
 ```
 API_PORT=3020
+API_HOST=                  # 127.0.0.1 en dev; 0.0.0.0 en producción/contenedor
+TRUST_PROXY=               # 1 detrás de reverse proxy (rate limit por IP real)
 PUBLIC_APP_URL=            # URL del FRONT (QR, CORS, back_urls de MP)
-# FALTA y hace falta: PUBLIC_API_URL para el notification_url del webhook de MP
+PUBLIC_API_URL=            # URL de la API: acá van los webhooks de MP. Si falta, cae a PUBLIC_APP_URL
 DATABASE_URL=              # vacío => PGlite embebido (DEMO)
 PAYMENT_PROVIDER=demo      # demo | mercadopago
 MERCADOPAGO_ACCESS_TOKEN=

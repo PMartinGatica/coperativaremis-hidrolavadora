@@ -3,14 +3,13 @@
 > Índice interno de este Mundo. El agente lee ESTO, no explora. Reemplaza la exploración del árbol
 > para siempre. Escrito para un agente que llega sin contexto.
 
-## ⚠️ Dos raíces distintas
+## Raíz única
 
-| Qué | Ruta |
-|---|---|
-| **Memoria del Mundo** (lo que estás leyendo) | `Madre/mundos/hidro-self-service/` |
-| **Código** (todo lo demás de este MAPA) | `D:/insolva/Desarrollo/Deepseek-harnes/hidro-self-service/` |
+Memoria y código conviven en `Madre/mundos/hidro-self-service/` (ADR-012, 2026-09-04). Todas las
+rutas de este MAPA son relativas a esa carpeta. Repo:
+**https://github.com/PMartinGatica/coperativaremis-hidrolavadora** (privado).
 
-Todas las rutas de las tablas de abajo son **relativas a la raíz de código**.
+> Si ves una ruta que apunta a `Deepseek-harnes/`, es de antes de la consolidación: está muerta.
 
 ## Stack y comandos
 - Monorepo **npm workspaces** (`apps/*`, `packages/*`). Node ≥ 20.6 (probado con 24). NO pnpm.

@@ -11,26 +11,24 @@
 ---
 
 <donde-vive-el-codigo>
-⚠️ **LEER ESTO ANTES DE BUSCAR UN ARCHIVO.** Este Mundo es el único cuyo código **NO vive dentro
-de `Madre/`**:
+**Código y memoria viven juntos en esta carpeta**, igual que los otros 4 Mundos:
+`Madre/mundos/hidro-self-service/` es a la vez la memoria (este archivo, ESTADO, MAPA, ADR,
+cadencia, conexiones, skills, storyline) **y el repo de código** (`apps/`, `packages/`,
+`firmware/`, `docs/`, `infrastructure/`, `scripts/`).
 
-| Qué | Dónde |
-|---|---|
-| **Memoria del Mundo** (este archivo, ESTADO, MAPA, ADR, fases, qa, storyline) | `Madre/mundos/hidro-self-service/` |
-| **Código de producción** (api, web, packages, firmware, docs técnicos) | `D:/insolva/Desarrollo/Deepseek-harnes/hidro-self-service/` |
+Repo propio: **https://github.com/PMartinGatica/coperativaremis-hidrolavadora** (privado).
+`Madre/.gitignore` tiene `/mundos/`, así que este repo anidado no interfiere con el de Madre.
 
-Motivo: el sistema lo construyó **DeepSeek** en su propio harness, fuera del árbol de Madre
-(ver ADR del Mundo, 2026-09-03). El Universo indexa y gobierna; el código se edita allá.
+> Historia: hasta el 2026-09-04 el código vivía fuera, en `Deepseek-harnes/hidro-self-service/`,
+> porque lo había construido DeepSeek en su harness (ADR-004). Con el Build ya propio (ADR-008)
+> esa razón desapareció y se consolidó todo acá (ADR-012). Si encontrás una ruta que apunte a
+> `Deepseek-harnes/`, está desactualizada.
 
-**Consecuencias operativas, todas obligatorias:**
-1. Las búsquedas acotadas del protocolo se acotan a **esa** carpeta, no a esta.
-2. Ese repo **todavía no está bajo git** (ni él ni `Deepseek-harnes/`). Hasta que lo esté, no hay
-   historial, no hay rollback y **gstack no puede archivar artefactos** (necesita `.git` + remote).
-   Es la deuda #1 del Mundo.
-3. `export GSTACK_PROJECT_SLUG=PMartinGatica-hidro-self-service` **antes de la primera skill de
-   gstack**, prefijado en CADA comando (el shell no conserva estado entre llamadas). Sin el
-   override, los artefactos caen en `PMartinGatica-madreinsolva`. También está fijado en
-   `.claude/settings.json` de esta carpeta.
+**Regla que SIGUE vigente:** `export GSTACK_PROJECT_SLUG=PMartinGatica-hidro-self-service` antes
+de la primera skill de gstack, prefijado en CADA comando (el shell no conserva estado entre
+llamadas). Tener `.git` + remote propio **no alcanza**: `gstack-slug` camina al ancestro MÁS
+EXTERNO con `.git`+remote y `Madre/` gana igual — verificado el 2026-09-04, sin el override
+resuelve a `PMartinGatica-madreinsolva`. También está fijado en `.claude/settings.json`.
 </donde-vive-el-codigo>
 
 ---
@@ -66,7 +64,7 @@ Decisiones cerradas del Mundo (NO reabrir sin consultar — ver `ADR.md` del Mun
 - El pago no enciende el motor. La autorización es temporal y la consume el pulsador físico.
 - El timer de 180 s es LOCAL del ESP32.
 - El botón físico del mecánico (llave de la caja) sigue funcionando por fuera del sistema.
-- El código vive en `Deepseek-harnes/hidro-self-service`, no en `Madre/`.
+- Código y memoria conviven en esta carpeta, con repo propio (ADR-012, supersede el ADR-004).
 - **El Build lo hace Claude** (ADR-008, 2026-09-04 — revierte el ADR-005 "Build = DeepSeek").
 </que-es>
 
