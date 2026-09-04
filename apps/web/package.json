@@ -1,0 +1,33 @@
+{
+  "name": "@hidro/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@fontsource/chakra-petch": "^5.2.5",
+    "@fontsource/ibm-plex-mono": "^5.2.5",
+    "@fontsource/ibm-plex-sans": "^5.2.5",
+    "@hidro/shared": "^1.0.0",
+    "@hidro/state-machine": "^1.0.0",
+    "lucide-react": "^0.525.0",
+    "qrcode": "^1.5.4",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^6.30.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.11",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.5.2",
+    "tailwindcss": "^4.1.11",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
+  }
+}

@@ -1,0 +1,12 @@
+node_modules
+.npm-cache-local
+dist
+.data
+.simulator
+.env
+.env.*
+!.env.example
+.screenshots
+*.log
+Dockerfile
+.dockerignore

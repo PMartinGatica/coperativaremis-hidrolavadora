@@ -1,0 +1,42 @@
+﻿{
+  "name": "@hidro/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "node dist/index.js",
+    "start": "node dist/index.js",
+    "db:generate": "drizzle-kit generate",
+    "seed": "node dist/scripts/seed.js",
+    "test": "vitest run",
+    "test:e2e": "vitest run tests/e2e.test.ts"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.3.6",
+    "@hidro/shared": "^1.0.0",
+    "@hidro/state-machine": "^1.0.0",
+    "cors": "^2.8.5",
+    "drizzle-orm": "^0.45.2",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mercadopago": "^2.2.0",
+    "pg": "^8.16.3",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.23",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22.15.0",
+    "@types/pg": "^8.15.4",
+    "@types/supertest": "^6.0.3",
+    "drizzle-kit": "^0.31.1",
+    "supertest": "^7.1.2",
+    "typescript": "^5.8.0",
+    "vitest": "^3.2.0"
+  }
+}
+

@@ -1,0 +1,19 @@
+# HIDRO SELF-SERVICE — reverse proxy (Caddy) con HTTPS automático.
+# El front estático se sirve desde apps/web/dist (o el puerto 5173 en dev).
+# Los webhooks de Mercado Pago llegan a la API (PUBLIC_API_URL apunta a este dominio).
+
+tu-dominio.com {
+    # API (webhooks, dispositivo, admin, público)
+    handle /api/* {
+        reverse_proxy 127.0.0.1:3020
+    }
+    handle /health {
+        reverse_proxy 127.0.0.1:3020
+    }
+    # Frontend estático (ajustá la ruta al build productivo)
+    handle {
+        root * /srv/hidro/web
+        try_files {path} /index.html
+        file_server
+    }
+}

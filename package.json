@@ -1,0 +1,28 @@
+{
+  "name": "hidro-self-service",
+  "version": "0.1.0",
+  "private": true,
+  "description": "HIDRO SELF-SERVICE - Hidrolavadora autoservicio multi-máquina (web + API + firmware ESP32)",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20.6"
+  },
+  "scripts": {
+    "build": "npm run build -w @hidro/shared && npm run build -w @hidro/state-machine && npm run build -w @hidro/api && npm run build -w @hidro/web",
+    "build:api": "npm run build -w @hidro/shared && npm run build -w @hidro/state-machine && npm run build -w @hidro/api",
+    "build:web": "npm run build -w @hidro/shared && npm run build -w @hidro/state-machine && npm run build -w @hidro/web",
+    "dev:api": "npm run dev -w @hidro/api",
+    "dev:web": "npm run dev -w @hidro/web",
+    "start:api": "npm run start -w @hidro/api",
+    "seed": "npm run seed -w @hidro/api",
+    "db:generate": "npm run db:generate -w @hidro/api",
+    "test": "npm run test -w @hidro/shared && npm run test -w @hidro/state-machine && npm run test -w @hidro/api",
+    "test:e2e": "npm run test:e2e -w @hidro/api",
+    "verify": "node scripts/verify-e2e.mjs",
+    "check:firmware": "node scripts/check-firmware.mjs",
+    "build:firmware": "pio run -d firmware/esp32"
+  }
+}

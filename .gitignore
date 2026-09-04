@@ -1,0 +1,29 @@
+﻿node_modules/
+dist/
+build/
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+
+# datos locales (DB embebida, secretos de dispositivos demo, NVS del simulador)
+.data/
+.simulator/
+apps/api/.data/
+apps/api/.simulator/
+
+# cache de npm local (532 MB: nunca va al repo)
+.npm-cache-local/
+
+# herramientas
+.vite/
+coverage/
+playwright-report/
+test-results/
+
+# verificación local
+.screenshots/
+
+# build del firmware (PlatformIO)
+.pio/

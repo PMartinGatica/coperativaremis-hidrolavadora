@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Presupuesto HIDRO-01</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+
+<style>
+:root{
+  --ground:#F1F2EE; --paper:#FBFBF9; --sunk:#E7E9E2;
+  --ink:#191C18; --ink-2:#565C55; --ink-3:#7C837A;
+  --rule:#D3D6CE; --rule-strong:#B4B9AC;
+  --accent:#A85E11; --accent-soft:#F2E5D2;
+  --ok:#2F6B3A; --ok-soft:#DFEBDF;
+  --stop:#9E2B25; --stop-soft:#F4E0DD;
+  --shadow:0 1px 2px rgba(25,28,24,.05), 0 10px 28px -18px rgba(25,28,24,.28);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#131612; --paper:#1B1F1A; --sunk:#0E110C;
+    --ink:#E9EBE3; --ink-2:#9BA294; --ink-3:#7B8375;
+    --rule:#2E3429; --rule-strong:#454C3E;
+    --accent:#DFA052; --accent-soft:#33291B;
+    --ok:#68AE74; --ok-soft:#1E2B1F;
+    --stop:#D9706A; --stop-soft:#2E1D1B;
+    --shadow:0 1px 2px rgba(0,0,0,.45), 0 10px 28px -18px rgba(0,0,0,.75);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#131612; --paper:#1B1F1A; --sunk:#0E110C;
+  --ink:#E9EBE3; --ink-2:#9BA294; --ink-3:#7B8375;
+  --rule:#2E3429; --rule-strong:#454C3E;
+  --accent:#DFA052; --accent-soft:#33291B;
+  --ok:#68AE74; --ok-soft:#1E2B1F;
+  --stop:#D9706A; --stop-soft:#2E1D1B;
+  --shadow:0 1px 2px rgba(0,0,0,.45), 0 10px 28px -18px rgba(0,0,0,.75);
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--ground); color:var(--ink);
+  font-family:"Source Serif 4",Georgia,"Times New Roman",serif;
+  font-size:17px; line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+  padding:0 20px 96px;
+}
+.wrap{max-width:860px;margin:0 auto}
+
+h1,h2,h3,.plate-label,.eyebrow,.tag,th,.step-name,.note-t,.stamp{
+  font-family:Archivo,"Helvetica Neue",Arial,sans-serif;
+}
+h2,h3{text-wrap:balance}
+h1{text-wrap:balance}
+p{margin:0}
+a{color:var(--accent);text-underline-offset:3px;text-decoration-thickness:1px}
+a:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:2px}
+code,.mono,.num{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace}
+.num{font-variant-numeric:tabular-nums}
+
+.masthead{padding:64px 0 0;display:flex;flex-direction:column;gap:22px}
+.eyebrow{
+  font-size:11.5px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--accent);display:flex;flex-wrap:wrap;gap:10px;align-items:center;
+}
+.eyebrow .sep{color:var(--rule-strong)}
+h1{
+  font-size:clamp(30px,5.2vw,46px);font-weight:700;line-height:1.08;
+  letter-spacing:-.022em;margin:0;
+}
+.deck{font-size:19px;color:var(--ink-2);max-width:60ch}
+
+.plate{
+  margin-top:8px;background:var(--paper);
+  border:1px solid var(--rule-strong);border-radius:3px;box-shadow:var(--shadow);
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));
+  overflow:hidden;
+}
+.plate-hd{
+  grid-column:1/-1;display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  padding:11px 18px;border-bottom:1px solid var(--rule-strong);background:var(--sunk);
+  font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--ink-2);
+}
+.cell{padding:18px;border-right:1px solid var(--rule)}
+.plate-label{
+  font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-3);margin-bottom:7px;
+}
+.cell-v{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
+  font-size:23px;font-weight:600;letter-spacing:-.02em;line-height:1.15}
+.cell-v.hero{color:var(--accent)}
+.cell-u{font-size:14px;color:var(--ink-3)}
+.cell-note{font-size:13px;color:var(--ink-3);margin-top:5px;line-height:1.4}
+
+.flow-shell{margin-top:34px;overflow-x:auto;padding-bottom:6px}
+.flow{display:flex;align-items:stretch;min-width:640px}
+.step{flex:1;padding:13px 12px;background:var(--paper);
+  border:1px solid var(--rule);border-right:none}
+.step:first-child{border-radius:3px 0 0 3px}
+.step:last-child{border-right:1px solid var(--rule);border-radius:0 3px 3px 0}
+.step-n{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--ink-3);letter-spacing:.1em}
+.step-name{font-size:12.5px;font-weight:600;line-height:1.3;margin-top:5px;letter-spacing:-.005em}
+.step.on{background:var(--ok-soft);border-color:var(--ok)}
+.step.on .step-name{color:var(--ok)}
+.step.cut{background:var(--stop-soft);border-color:var(--stop)}
+.step.cut .step-name{color:var(--stop)}
+.cap{margin-top:9px;font-size:13.5px;color:var(--ink-3);font-style:italic;max-width:68ch}
+
+section{margin-top:62px}
+.sec-hd{display:flex;align-items:baseline;gap:13px;padding-bottom:11px;
+  border-bottom:2px solid var(--ink);margin-bottom:26px;flex-wrap:wrap}
+.sec-n{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:600;
+  color:var(--accent);letter-spacing:.06em}
+h2{font-size:clamp(21px,3vw,27px);font-weight:700;letter-spacing:-.018em;margin:0;flex:1}
+h3{font-size:17px;font-weight:600;letter-spacing:-.008em;margin:30px 0 9px}
+.prose{display:flex;flex-direction:column;gap:15px;max-width:68ch}
+.lede{font-size:19px;line-height:1.55}
+
+.tbl-shell{overflow-x:auto;margin:22px 0;border:1px solid var(--rule);
+  border-radius:3px;background:var(--paper);box-shadow:var(--shadow)}
+table{width:100%;border-collapse:collapse;font-size:15px;min-width:480px}
+th{
+  font-size:10.5px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--ink-3);text-align:left;padding:11px 16px;
+  border-bottom:1px solid var(--rule-strong);background:var(--sunk);white-space:nowrap;
+}
+td{padding:12px 16px;border-bottom:1px solid var(--rule);vertical-align:top}
+tr:last-child td{border-bottom:none}
+.r{text-align:right;font-family:"IBM Plex Mono",monospace;
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.tot td{background:var(--sunk);font-weight:600;border-top:1px solid var(--rule-strong)}
+.tot .r{color:var(--accent);font-size:16px}
+.k{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-3)}
+.blk{font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--ink-3);
+  font-variant-numeric:tabular-nums}
+.good-n{color:var(--ok);font-weight:600}
+.bad-n{color:var(--stop)}
+
+.note{
+  margin:24px 0;padding:17px 20px;background:var(--paper);
+  border:1px solid var(--rule);border-left:3px solid var(--accent);
+  border-radius:0 3px 3px 0;font-size:15.5px;line-height:1.58;
+}
+.note.risk{border-left-color:var(--stop)}
+.note.good{border-left-color:var(--ok)}
+.note-t{
+  font-size:10.5px;font-weight:600;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:7px;
+}
+.note.risk .note-t{color:var(--stop)}
+.note.good .note-t{color:var(--ok)}
+
+.cards{display:flex;flex-direction:column;gap:12px;margin:22px 0}
+.card{background:var(--paper);border:1px solid var(--rule);border-radius:3px;padding:17px 19px}
+.card-hd{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap}
+.card-n{font-family:"IBM Plex Mono",monospace;font-size:14.5px;font-weight:600;word-break:break-word}
+.card-m{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--ink-3);
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.card p{font-size:14.5px;line-height:1.55;color:var(--ink-2);margin-top:8px}
+.tag{
+  display:inline-block;font-size:10px;font-weight:600;letter-spacing:.12em;
+  text-transform:uppercase;padding:3px 8px;border-radius:2px;margin-bottom:10px;
+  background:var(--accent-soft);color:var(--accent);
+}
+.tag.t2{background:var(--sunk);color:var(--ink-2)}
+
+ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;max-width:68ch}
+li{padding-left:3px}
+li::marker{color:var(--accent)}
+
+.annex{
+  margin-top:76px;padding:34px 28px 40px;background:var(--sunk);
+  border:1px dashed var(--rule-strong);border-radius:3px;
+}
+.annex section:first-of-type{margin-top:30px}
+.stamp{
+  display:inline-flex;align-items:center;gap:9px;
+  font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--stop);border:1.5px solid var(--stop);padding:6px 12px;border-radius:2px;
+}
+.annex .card,.annex .tbl-shell,.annex .note{background:var(--paper)}
+.cmd{padding:16px 18px;font-size:13px;line-height:1.95;display:block;color:var(--ink-2);
+  overflow-x:auto;white-space:pre}
+
+footer{
+  margin-top:64px;padding-top:22px;border-top:1px solid var(--rule);
+  display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--ink-3);
+  letter-spacing:.06em;
+}
+@media (max-width:620px){
+  body{font-size:16px;padding:0 16px 72px}
+  .masthead{padding-top:44px}
+  .cell{padding:15px}
+  .annex{padding:26px 17px 32px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+
+.printbar{max-width:860px;margin:0 auto 14px;display:flex;justify-content:flex-end;padding-top:20px}
+.printbtn{
+  font-family:Archivo,sans-serif;font-size:13px;font-weight:600;color:var(--paper);
+  background:var(--accent);border:none;border-radius:4px;padding:9px 16px;cursor:pointer;
+}
+.printbtn:hover{background:var(--stop)}
+.printbtn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+
+@media print{
+  body{background:#fff;padding:0}
+  .printbar{display:none}
+  .annex{background:#fff}
+  @page{size:A4;margin:14mm}
+}
+</style>
+</head>
+<body>
+
+<div class="printbar"><button class="printbtn" onclick="window.print()">Descargar / Imprimir PDF</button></div>
+
+<div class="wrap">
+
+<header class="masthead">
+  <div class="eyebrow">
+    <span>DEVXIA</span><span class="sep">/</span>
+    <span>Propuesta técnica y económica</span><span class="sep">/</span>
+    <span>Agosto 2026</span>
+  </div>
+  <h1>Hidrolavadora autoservicio con cobro por QR</h1>
+  <p class="deck">Sistema de cobro y control para la Cooperativa de Remises. El cliente
+  escanea, paga, y la máquina se habilita por tres minutos exactos. Sin fichas, sin
+  monedas y sin nadie atendiendo.</p>
+
+  <div class="plate">
+    <div class="plate-hd">
+      <span>Placa de características · HIDRO-01</span>
+      <span>Motor 5 HP · preparado para HIDRO-02 (10 HP)</span>
+    </div>
+    <div class="cell">
+      <div class="plate-label">Desarrollo</div>
+      <div class="cell-v hero">USD 2.300</div>
+      <div class="cell-note">Precio cerrado, todo incluido</div>
+    </div>
+    <div class="cell">
+      <div class="plate-label">Ingeniería</div>
+      <div class="cell-v num">80 h</div>
+      <div class="cell-note">Software, firmware y puesta en marcha</div>
+    </div>
+    <div class="cell">
+      <div class="plate-label">Segunda máquina</div>
+      <div class="cell-v num">USD 350</div>
+      <div class="cell-note">Precio en firme por 12 meses</div>
+    </div>
+    <div class="cell">
+      <div class="plate-label">Mantenimiento</div>
+      <div class="cell-v num">USD 45<span class="cell-u">/mes</span></div>
+      <div class="cell-note">Desde el mes 4. Antes, garantía sin costo</div>
+    </div>
+  </div>
+</header>
+
+<div class="flow-shell">
+  <div class="flow">
+    <div class="step"><div class="step-n">01</div><div class="step-name">Escanea el QR</div></div>
+    <div class="step"><div class="step-n">02</div><div class="step-name">Paga con Mercado Pago</div></div>
+    <div class="step"><div class="step-n">03</div><div class="step-name">El pago se confirma</div></div>
+    <div class="step on"><div class="step-n">04</div><div class="step-name">Luz verde: autorizada</div></div>
+    <div class="step"><div class="step-n">05</div><div class="step-name">Aprieta el pulsador</div></div>
+    <div class="step"><div class="step-n">06</div><div class="step-name">El contactor cierra</div></div>
+    <div class="step cut"><div class="step-n">07</div><div class="step-name">180 s y corta</div></div>
+  </div>
+</div>
+<p class="cap">Una vez que arrancó, el ciclo se completa aunque se caiga internet: el
+tiempo lo cuenta la máquina, no el servidor.</p>
+
+<section>
+  <div class="sec-hd"><span class="sec-n">01</span><h2>Qué se entrega</h2></div>
+  <div class="prose">
+    <p class="lede">Un sistema completo de cobro y habilitación, no una página web con un
+    botón de pago.</p>
+    <p>Incluye la web móvil que se abre al escanear el QR, el servidor que valida el pago
+    contra Mercado Pago, la base de datos de sesiones y autorizaciones, el firmware del
+    equipo que controla el relé y cuenta los 180 segundos, un panel de administración
+    para ver el estado de las máquinas y cortar de emergencia, y la instalación y puesta
+    en marcha en sitio.</p>
+    <p>El software se construye <strong>multi-máquina desde el primer día</strong>. Hoy
+    se instala una sola hidro, pero cada QR identifica su máquina y el servidor sabe
+    exactamente cuál habilitar. Hacerlo ahora cuesta poco; hacerlo después obliga a
+    rehacer medio sistema.</p>
+  </div>
+  <div class="note">
+    <div class="note-t">Fuera de alcance</div>
+    La parte de potencia —contactor, protecciones, tablero, cableado e instalación
+    eléctrica— la resuelve Lucho y se cotiza por separado. El equipo de control nunca
+    maneja directamente el motor: manda una señal de baja tensión y el contactor hace
+    el resto.
+  </div>
+</section>
+
+<section>
+  <div class="sec-hd"><span class="sec-n">02</span><h2>Sobre el repositorio de referencia</h2></div>
+  <div class="prose">
+    <p class="lede">Se analizó a fondo el proyecto público que se había encontrado como
+    posible base. Sirve como referencia conceptual, pero no como código reutilizable.</p>
+    <p>Conviene que quede escrito, porque la diferencia entre «adaptamos algo que ya
+    existe» y «lo construimos» es exactamente lo que justifica las horas de esta
+    propuesta.</p>
+  </div>
+
+  <div class="tbl-shell">
+    <table>
+      <thead><tr><th>Qué se esperaba encontrar</th><th>Qué hay realmente</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>El servidor con la lógica de pago</strong><br>
+            <span class="k">Era la pieza más valiosa</span></td>
+          <td><strong>No existe.</strong> La carpeta es un enlace roto a un repositorio que
+            nunca se publicó. Al descargarlo queda vacía: no hay validación de pago, ni
+            órdenes, ni disparo del hardware.</td>
+        </tr>
+        <tr>
+          <td><strong>Firmware que accione el relé</strong></td>
+          <td>El equipo <strong>no controla ningún relé.</strong> Es apenas un puente hacia
+            una nube de terceros; los relés los maneja un segundo microcontrolador que
+            nosotros no vamos a usar.</td>
+        </tr>
+        <tr>
+          <td><strong>Modelo de autorización</strong></td>
+          <td>No hay. El pago dispara un comando directo, sin vencimiento ni control de
+            uso. Es justamente el diseño que permite pagar una vez y usar dos.</td>
+        </tr>
+        <tr>
+          <td><strong>Manejo seguro de credenciales</strong></td>
+          <td>La contraseña del WiFi y la clave de la nube están escritas dentro del código
+            y publicadas.</td>
+        </tr>
+        <tr>
+          <td><strong>Web pensada para el celular</strong></td>
+          <td>Es un diseño de escritorio a tres columnas, con las máquinas escritas a mano
+            dentro del código. El 100 % de los usuarios entra desde el celular.</td>
+        </tr>
+        <tr>
+          <td><strong>Arquitectura de producción</strong></td>
+          <td>El servidor corría en una PC local expuesta por un túnel. Es una demo de
+            facultad, no un sistema que cobra plata sin supervisión.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note good">
+    <div class="note-t">Lo que sí aporta, y se aprovecha</div>
+    Confirma que el patrón funciona en la vida real, y deja dos ideas concretas que se
+    adoptan: comprimir los ciclos durante las pruebas —para poder testear los 180 segundos
+    cientos de veces sin esperar horas reales— y consultar el estado del pago en paralelo,
+    como respaldo por si Mercado Pago se demora en avisar. Su licencia permite además usar
+    sus diagramas en la presentación.
+  </div>
+
+  <div class="note risk">
+    <div class="note-t">Conclusión</div>
+    Ahorra entre cuatro y seis horas de análisis. <strong>No ahorra una sola hora de
+    servidor, de Mercado Pago ni de firmware.</strong> El presupuesto no baja por tenerlo.
+  </div>
+</section>
+
+<section>
+  <div class="sec-hd"><span class="sec-n">03</span><h2>Sobre qué se construye entonces</h2></div>
+  <div class="prose">
+    <p>Se buscaron alternativas reales. La combinación exacta —QR, pago online y
+    habilitación de una máquina física— no existe publicada con licencia abierta a nivel
+    producción. Pero cada mitad del problema sí está resuelta, y de ahí se toma el diseño.</p>
+  </div>
+
+  <h3>Se adopta directamente</h3>
+  <div class="cards">
+    <div class="card">
+      <span class="tag">Herramienta oficial</span>
+      <div class="card-hd">
+        <span class="card-n">Kit de integración de Mercado Pago</span>
+        <span class="card-m">Apache-2.0 · activo</span>
+      </div>
+      <p>Publicado por Mercado Pago para el entorno de desarrollo que ya usamos. Trae la
+      validación de firma de las notificaciones de pago, la creación de usuarios de prueba
+      con saldo cargado, soporte específico para cobro por QR y un control que bloquea
+      credenciales escritas en el código: exactamente el error del proyecto anterior.</p>
+    </div>
+    <div class="card">
+      <span class="tag">Librería</span>
+      <div class="card-hd">
+        <span class="card-n">SDK oficial de Mercado Pago para Node.js</span>
+        <span class="card-m">481 ★ · oficial</span>
+      </div>
+      <p>No es una referencia a mirar: es una dependencia directa del servidor.</p>
+    </div>
+  </div>
+
+  <h3>Referencia de diseño</h3>
+  <div class="cards">
+    <div class="card">
+      <span class="tag t2">Carga de autos eléctricos</span>
+      <div class="card-hd">
+        <span class="card-n">MicroOcpp</span>
+        <span class="card-m">536 ★ · corre en el mismo tipo de equipo</span>
+      </div>
+      <p>El mejor hallazgo. La industria de la carga eléctrica ya estandarizó nuestro
+      problema: autorizar a un usuario, energizar una toma física, contar la sesión,
+      cortar y facturar. Y ya resolvió todas las fallas que hay que prever —caída de
+      conexión, reinicio en medio de la sesión, autorización duplicada, operación sin
+      internet—. No adoptamos su protocolo, que sería excesivo para una hidro: copiamos su
+      modelo de sesión que sobrevive a un reinicio, que es la parte más difícil del firmware.</p>
+    </div>
+    <div class="card">
+      <span class="tag t2">Talleres comunitarios</span>
+      <div class="card-hd">
+        <span class="card-n">MemberMatters</span>
+        <span class="card-m">91 ★ · 5+ años en producción</span>
+      </div>
+      <p>Lo más parecido a lo nuestro que funciona de verdad hace años: un portal que cobra,
+      verifica que el socio esté al día y recién ahí activa el contactor de la máquina. Sus
+      salidas documentadas son literalmente contactores de habilitación de herramientas.</p>
+    </div>
+    <div class="card">
+      <span class="tag t2">Bicicletas compartidas</span>
+      <div class="card-hd">
+        <span class="card-n">Open Source Bike Share</span>
+        <span class="card-m">QR pegado en el objeto</span>
+      </div>
+      <p>La referencia más cercana en experiencia de uso: escaneás el QR pegado en la bici
+      y el sistema devuelve un código de un solo uso que la desbloquea. Son exactamente
+      nuestros pasos 1 y 2.</p>
+    </div>
+  </div>
+
+  <div class="note">
+    <div class="note-t">Qué significa esto para el precio</div>
+    Ninguna de estas referencias tiene Mercado Pago: la capa de cobro argentina es
+    íntegramente nuestra, y es el bloque más caro y el de mayor incertidumbre. Lo que estas
+    referencias reducen no son horas, es <strong>riesgo</strong>. El ahorro real —cuatro a
+    seis horas— se reinvierte en pruebas.
+  </div>
+</section>
+
+<section>
+  <div class="sec-hd"><span class="sec-n">04</span><h2>Detalle de horas</h2></div>
+  <div class="prose">
+    <p>Once bloques, en el orden en que se ejecutan. El bloque 00 es una validación técnica
+    que condiciona todo lo demás, y por eso va primero.</p>
+  </div>
+  <div class="tbl-shell">
+    <table>
+      <thead><tr><th style="width:46px">#</th><th>Bloque</th><th class="r">Horas</th></tr></thead>
+      <tbody>
+        <tr><td class="blk">00</td><td><strong>Validación del cobro por QR</strong> — prueba en
+          entorno de pruebas antes de construir nada encima</td><td class="r num">6</td></tr>
+        <tr><td class="blk">01</td><td>Análisis, arquitectura y protocolo de comunicación</td><td class="r num">8</td></tr>
+        <tr><td class="blk">02</td><td>Servidor, base de datos, sesiones y autorizaciones</td><td class="r num">12</td></tr>
+        <tr><td class="blk">03</td><td>Integración con Mercado Pago y conciliación</td><td class="r num">10</td></tr>
+        <tr><td class="blk">04</td><td>Web móvil: identificación de máquina, pago y estado</td><td class="r num">7</td></tr>
+        <tr><td class="blk">05</td><td>Firmware: relé, pulsador, luz y temporizador</td><td class="r num">10</td></tr>
+        <tr><td class="blk">06</td><td>Canal seguro servidor–máquina y detección de caídas</td><td class="r num">6</td></tr>
+        <tr><td class="blk">07</td><td>Panel de administración y corte de emergencia</td><td class="r num">6</td></tr>
+        <tr><td class="blk">08</td><td>Pruebas, incluidas las de uso indebido</td><td class="r num">8</td></tr>
+        <tr><td class="blk">09</td><td>Publicación e infraestructura</td><td class="r num">4</td></tr>
+        <tr><td class="blk">10</td><td>Puesta en marcha en sitio, QR y documentación</td><td class="r num">6</td></tr>
+        <tr class="tot"><td></td><td>Total estimado</td><td class="r num">83 h</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="cap">Se cotizan 80 horas. La diferencia se absorbe dentro del precio cerrado.</p>
+</section>
+
+<section>
+  <div class="sec-hd"><span class="sec-n">05</span><h2>Precio</h2></div>
+  <div class="tbl-shell">
+    <table>
+      <thead><tr><th>Concepto</th><th class="r">Monto</th></tr></thead>
+      <tbody>
+        <tr><td>Desarrollo, integración e implementación<br>
+          <span class="k">80 h a USD 25/h</span></td><td class="r num">USD 2.000</td></tr>
+        <tr><td>Gestión del proyecto y contingencia<br>
+          <span class="k">15 % — es el primer equipo de su tipo</span></td><td class="r num">USD 300</td></tr>
+        <tr class="tot"><td>Total DEVXIA — HIDRO-01</td><td class="r num">USD 2.300</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Forma de pago</h3>
+  <div class="tbl-shell">
+    <table>
+      <thead><tr><th>Hito</th><th class="r">%</th><th class="r">Monto</th></tr></thead>
+      <tbody>
+        <tr><td>Anticipo, al aceptar la propuesta</td><td class="r num">40 %</td><td class="r num">USD 920</td></tr>
+        <tr><td>Prototipo de laboratorio aprobado<br>
+          <span class="k">Todo probado sobre una carga de prueba, antes de tocar la hidro</span></td>
+          <td class="r num">30 %</td><td class="r num">USD 690</td></tr>
+        <tr><td>Puesta en marcha en sitio</td><td class="r num">30 %</td><td class="r num">USD 690</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note">
+    <div class="note-t">Por qué el hito del prototipo no se saltea</div>
+    Es donde aparecen los problemas de campo —transitorios del motor, alcance del WiFi,
+    rebotes del pulsador— mientras todavía son baratos de resolver. Probar directamente
+    sobre la hidrolavadora sale mucho más caro.
+  </div>
+
+  <h3>Segunda hidrolavadora</h3>
+  <div class="prose">
+    <p><strong>USD 350</strong>, precio en firme por doce meses: segundo equipo
+    configurado, segunda caja de cobro, segundo QR, pruebas y puesta en marcha. Hardware e
+    instalación eléctrica aparte. Este precio se sostiene únicamente porque el software se
+    construye multi-máquina desde el inicio.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-hd"><span class="sec-n">06</span><h2>Costos que no son desarrollo</h2></div>
+  <div class="prose">
+    <p>Van a nombre y a cargo de la cooperativa. Se listan explícitamente para que no
+    aparezcan como sorpresa más adelante.</p>
+  </div>
+
+  <h3>Infraestructura mensual</h3>
+  <div class="tbl-shell">
+    <table>
+      <thead><tr><th>Concepto</th><th>Recomendación</th><th class="r">Estimado</th></tr></thead>
+      <tbody>
+        <tr><td>Servidor, siempre encendido</td><td>Railway, Fly.io o servidor propio</td><td class="r num">USD 5–10/mes</td></tr>
+        <tr><td>Base de datos</td><td>Incluida en el servidor o plan gratuito</td><td class="r num">USD 0–7/mes</td></tr>
+        <tr><td>Canal de mensajería con las máquinas</td><td>En el mismo servidor</td><td class="r num">USD 0–5/mes</td></tr>
+        <tr><td>Dominio</td><td>.com o .com.ar</td><td class="r num">USD 12–15/año</td></tr>
+        <tr><td>Certificado de seguridad</td><td>Let's Encrypt</td><td class="r num">Sin costo</td></tr>
+        <tr><td>Monitoreo de caídas</td><td>UptimeRobot</td><td class="r num">USD 0–5/mes</td></tr>
+        <tr><td>Internet en el sitio</td><td>WiFi existente, o router 4G</td><td class="r num">A definir</td></tr>
+        <tr class="tot"><td>Total</td><td></td><td class="r num">~USD 10–25/mes</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note risk">
+    <div class="note-t">Requisito, no preferencia</div>
+    El servidor no puede estar en un plan gratuito de los que se apagan por inactividad.
+    Una máquina que necesita respuesta en menos de dos segundos, contra un servidor que
+    tarda treinta en despertarse, deja al cliente parado frente a la hidro con el pago ya
+    hecho. El proyecto de referencia cometía exactamente ese error.
+  </div>
+
+  <h3>Comisiones de Mercado Pago</h3>
+  <div class="prose">
+    <p>Son costo operativo de la cooperativa, no de DEVXIA. Pero la elección del medio de
+    cobro es una decisión de diseño y conviene tomarla con los números a la vista.</p>
+  </div>
+  <div class="tbl-shell">
+    <table>
+      <thead><tr><th>Medio de cobro</th><th class="r">Comisión</th></tr></thead>
+      <tbody>
+        <tr><td><strong>QR pagado con saldo de Mercado Pago</strong><br>
+          <span class="k">La opción que estamos integrando</span></td>
+          <td class="r num good-n">0,6 %</td></tr>
+        <tr><td>QR pagado con tarjeta de débito</td><td class="r num">0,6 – 1,2 %</td></tr>
+        <tr><td>QR pagado con tarjeta de crédito</td><td class="r num">2,99 – 4,49 %</td></tr>
+        <tr><td>Checkout Pro con acreditación inmediata<br>
+          <span class="k">La alternativa más simple de integrar</span></td>
+          <td class="r num bad-n">6,39 % + IVA</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note">
+    <div class="note-t">La decisión más rentable de todo el proyecto</div>
+    Cobrar por QR con saldo en lugar de Checkout Pro es la diferencia entre perder
+    <strong>0,6 % o casi 7,7 %</strong> de cada lavado. En tickets chicos y mucho volumen,
+    esa sola decisión vale más que el presupuesto entero de software.
+    <br><br>
+    <strong>Con una salvedad honesta:</strong> el 0,6 % aplica solo cuando el cliente paga
+    con saldo. Si paga con crédito, la comisión sube. La comisión real termina siendo una
+    mezcla y hay que medirla los primeros meses.
+  </div>
+</section>
+
+<section>
+  <div class="sec-hd"><span class="sec-n">07</span><h2>Garantía y mantenimiento</h2></div>
+  <div class="prose">
+    <p class="lede">Una web que se rompe deja al cliente trabajando igual. Una
+    hidrolavadora que se rompe deja a la cooperativa sin cobrar.</p>
+    <p>Por eso esto no se entrega y se termina ahí.</p>
+  </div>
+  <div class="tbl-shell">
+    <table>
+      <thead><tr><th>Período</th><th>Qué incluye</th><th class="r">Costo</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Meses 1 a 3</strong><br><span class="k">Garantía</span></td>
+          <td>Corrección de cualquier falla de software o firmware atribuible al desarrollo.</td>
+          <td class="r num good-n">Sin costo</td></tr>
+        <tr><td><strong>Desde el mes 4</strong><br><span class="k">Abono mensual</span></td>
+          <td>Monitoreo, actualizaciones, corrección de errores, revisión del servidor y de
+            la comunicación con las máquinas, copias de seguridad y soporte remoto.</td>
+          <td class="r num">USD 45/mes</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="prose">
+    <p><strong>Queda fuera del abono</strong> y se cotiza aparte: reparación eléctrica,
+    reemplazo de equipos, contactor, router, daños por tensión o tormenta eléctrica, y
+    cambios de funcionalidad pedidos por la cooperativa. Si un rayo cocina el equipo, no es
+    un error de software. Cambios fuera de alcance, a USD 25 la hora.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-hd"><span class="sec-n">08</span><h2>Titularidad de las cuentas</h2></div>
+  <div class="prose">
+    <p>La cuenta de Mercado Pago, el dominio, el servidor y la conexión a internet van a
+    nombre de la cooperativa. DEVXIA cobra el desarrollo y el mantenimiento; no necesita
+    ser dueña de los activos del cliente.</p>
+    <p>Si en algún momento la cooperativa decide trabajar con otro proveedor, no debería
+    quedar rehén de cuentas ajenas. Es una condición que ponemos nosotros.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-hd"><span class="sec-n">09</span><h2>Datos que faltan para cerrar el esquema eléctrico</h2></div>
+  <div class="prose">
+    <p>No bloquean esta propuesta, pero sí el diseño del circuito. Cuanto antes lleguen,
+    antes arranca el bloque 01.</p>
+  </div>
+  <h3>De Lucho</h3>
+  <ul>
+    <li>Tensión de los motores: 220 V o 380 V, y si son monofásicos o trifásicos.</li>
+    <li>Corriente nominal de cada hidrolavadora, y la de arranque si figura.</li>
+    <li>Marca y modelo de los contactores y del temporizador actuales.</li>
+    <li>Cómo está armado hoy el circuito de mando, y si hay guardamotor y parada de emergencia.</li>
+    <li>Si hay WiFi en el lugar, y la distancia entre el tablero y donde iría el equipo.</li>
+    <li><strong>Una foto del tablero y del temporizador.</strong> Es lo que más ordena el
+      trabajo: preferimos diseñar sobre lo que ya tienen antes que inventar un tablero nuevo.</li>
+  </ul>
+  <h3>De la cooperativa</h3>
+  <ul>
+    <li>Precio del lavado de tres minutos. Define cuánto pesa realmente la comisión.</li>
+    <li>Qué hacer si un corte de luz interrumpe un lavado ya pagado: ¿se devuelve o queda a favor?</li>
+  </ul>
+
+  <div class="note">
+    <div class="note-t">Sobre el temporizador que ya está instalado</div>
+    Probablemente quede sin función, pero <strong>no lo sacamos durante el prototipo.</strong>
+    Se mantiene en serie como respaldo hasta comprobar que el sistema corta a los 180
+    segundos de forma consistente, se recupera de un reinicio y aguanta la pérdida de WiFi.
+    Y antes de retirarlo hay que verificar que no cumpla además alguna función de seguridad.
+  </div>
+</section>
+
+<div class="annex">
+  <span class="stamp">● Anexo · uso interno DEVXIA</span>
+
+  <section>
+    <div class="sec-hd"><span class="sec-n">A1</span><h2>Decisiones técnicas que sostienen el número</h2></div>
+    <div class="prose"><p>Si alguna de estas cambia, cambia el presupuesto.</p></div>
+    <ul>
+      <li><strong>Autorización con vencimiento, no comando directo.</strong> Tabla de
+        sesiones con máquina, pago, estado, vencimiento y marca de uso. Es lo que evita
+        pagar una vez y usar dos, apretar antes de pagar, o reutilizar una autorización vieja.</li>
+      <li><strong>El temporizador vive en el ESP32.</strong> Una vez arrancado el ciclo no
+        necesita internet para terminarlo.</li>
+      <li><strong>El relé arranca siempre apagado.</strong> Se persiste la sesión y los
+        segundos restantes en memoria no volátil; si el reinicio duró menos de 30 s se
+        reanuda, si no se corta y la sesión queda marcada como interrumpida.
+        <em>Falta definir con la cooperativa qué pasa con esa plata.</em></li>
+      <li><strong>Una caja de cobro por hidro.</strong> La máquina se identifica por la caja,
+        y la conciliación por máquina queda automática.</li>
+      <li><strong>Webhook y consulta en paralelo.</strong> El webhook es el camino principal;
+        la consulta desde la web es el respaldo.</li>
+      <li><strong>Validación de firma más reconsulta del pago.</strong> Las referencias
+        públicas hacen una cosa o la otra. Nosotros hacemos las dos.</li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="sec-hd"><span class="sec-n">A2</span><h2>Riesgo abierto</h2></div>
+    <div class="note risk">
+      <div class="note-t">El bloque 00 es una compuerta, no un trámite</div>
+      El QR dinámico de Mercado Pago tiene un punto débil de experiencia: el cliente no puede
+      escanear la pantalla de su propio celular. Hay que validar que el enlace directo a la
+      app funcione de forma confiable.
+      <br><br>
+      <strong>Si no funciona, el respaldo es Checkout Pro:</strong> anda seguro, pero le
+      cuesta a la cooperativa 7,7 % en vez de 0,6 %. Por eso esta prueba va primero y nada se
+      construye encima hasta que esté resuelta. Si termina cayendo al respaldo, hay que
+      avisarle a la cooperativa antes de firmar, porque le cambia la economía por lavado.
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-hd"><span class="sec-n">A3</span><h2>Hardware faltante en la lista original</h2></div>
+    <div class="prose">
+      <p>La lista de materiales del análisis inicial está incompleta para este ambiente.
+      Falta cotizar:</p>
+    </div>
+    <ul>
+      <li><strong>Gabinete estanco IP65</strong> para el equipo de control. Es una
+        hidrolavadora: hay agua a presión.</li>
+      <li><strong>Pulsador metálico IP67</strong>, no un pulsador común.</li>
+      <li><strong>Supresor RC en la bobina del contactor.</strong> El arranque de un motor de
+        10 HP genera transitorios capaces de reiniciar un ESP32. Es el punto que más horas de
+        campo cuesta si se descubre tarde.</li>
+      <li><strong>Fusible o térmica del circuito de mando</strong>, separada de la potencia.</li>
+      <li><strong>Cartel con el QR laminado para intemperie.</strong></li>
+      <li><strong>Router 4G con SIM</strong>, si no hay WiFi en el lugar.</li>
+      <li><strong>UPS chica para el equipo</strong> (opcional): evita que un microcorte
+        reinicie en medio de un ciclo ya pagado.</li>
+    </ul>
+    <div class="note">
+      <div class="note-t">Nota</div>
+      No se ponen precios en pesos: los cotiza Lucho con valores del día.
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-hd"><span class="sec-n">A4</span><h2>Matriz de pruebas de uso indebido</h2></div>
+    <div class="prose"><p>El bloque 08 no se da por cerrado hasta que estos quince casos pasen.</p></div>
+    <div class="tbl-shell">
+      <table>
+        <thead><tr><th>Caso</th><th>Comportamiento esperado</th></tr></thead>
+        <tbody>
+          <tr><td>Pago aprobado</td><td>Autoriza y enciende la luz verde</td></tr>
+          <tr><td>Pago rechazado</td><td>No autoriza, mensaje claro</td></tr>
+          <tr><td>Pago pendiente</td><td>Espera sin autorizar</td></tr>
+          <tr><td>Notificación duplicada</td><td>Una sola autorización</td></tr>
+          <tr><td>Notificación inválida o sin firma</td><td>Se descarta y se registra</td></tr>
+          <tr><td>Aprieta el pulsador sin pagar</td><td>No pasa nada</td></tr>
+          <tr><td>Doble pulsación</td><td>Un solo ciclo</td></tr>
+          <tr><td>Aprieta con autorización vencida</td><td>No arranca</td></tr>
+          <tr><td>Se cae internet antes de arrancar</td><td>Queda pendiente, no cobra de más</td></tr>
+          <tr><td>Se cae internet durante el ciclo</td><td>Completa los 180 s igual</td></tr>
+          <tr><td>Se reinicia el equipo durante el ciclo</td><td>Reanuda, o corta y marca interrumpida</td></tr>
+          <tr><td>Corte de energía durante el ciclo</td><td>Relé apagado al volver; sesión marcada</td></tr>
+          <tr><td>Máquina fuera de línea</td><td>La web lo informa antes de cobrar</td></tr>
+          <tr><td>Dos clientes pagan a la vez</td><td>Uno arranca, al otro se le devuelve</td></tr>
+          <tr><td>Paga la máquina 1 y aprieta la 2</td><td>La 2 no arranca</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-hd"><span class="sec-n">A5</span><h2>Primer paso concreto</h2></div>
+    <div class="prose">
+      <p>Instalar el kit oficial de Mercado Pago antes de escribir una línea del bloque 03,
+      porque condiciona cómo se escribe la integración y la prueba del bloque 00:</p>
+    </div>
+    <div class="tbl-shell">
+      <code class="cmd">/plugin marketplace add https://github.com/mercadopago/mercadopago-claude-marketplace.git
+/plugin install mercadopago@mercadopago-claude-marketplace</code>
+    </div>
+  </section>
+</div>
+
+<footer>
+  <span>DEVXIA · Propuesta HIDRO-01</span>
+  <span>Validez: 30 días · Precios en USD</span>
+</footer>
+
+</div>
+</body>
+</html>
