@@ -285,3 +285,25 @@
   la IP pública real; si no coinciden, subir `TRUST_PROXY` hasta que coincidan. Alternativa más
   robusta que hay que evaluar en la Fase 1: leer `CF-Connecting-IP`, que Cloudflare siempre
   sobreescribe y el cliente no puede falsificar. Queda como entrada de alcance de la Fase 1.
+
+- **2026-09-04 — ADR-023 [HALLAZGO, no es una decisión]: el barrido no "no reconcilia": escribe un
+  veredicto falso sobre dinero y cierra la puerta.** El ESTADO decía *"si MP pierde el webhook, el
+  cliente pagó y no pasa nada"*. Es peor que eso. Cadena verificada:
+  a los **120 s** (`DEFAULT_PAYMENT_PENDING_TIMEOUT_SECONDS`, `packages/shared/src/constants.ts:23`)
+  `sweepExpired` (`sessionService.ts:333`) transiciona `PAYMENT_PENDING → PAYMENT_EXPIRED` y marca el
+  pago `EXPIRED` con motivo `'expired'` — **sin preguntarle nada al proveedor**. Y `PAYMENT_EXPIRED`
+  es terminal: **verificado ejecutando** contra el paquete compilado, `TRANSITIONS.PAYMENT_EXPIRED`
+  es `[]`, y tanto `PAYMENT_EXPIRED → PAYMENT_APPROVED` como `→ AUTHORIZED` son imposibles. Un
+  webhook que llegue tarde **ya no puede recuperar la sesión**.
+  **Agravante que cambia la probabilidad:** los 120 s se cuentan desde `sessions.createdAt`, o sea
+  desde que el cliente carga la patente, **no** desde que abre el checkout. Escanear el QR, abrir la
+  app de MP, loguearse y confirmar, con la señal de una parada de remises, pasa de 2 minutos sin
+  esfuerzo. **No es un caso raro de webhook perdido: se dispara en un pago lento normal.**
+  **Trampa cargada, aparte:** `getPayment()` de la interfaz (`mercadoPagoProvider.ts:66`) consulta
+  una **preference**, no un pago, y devuelve `'PENDING'` **hardcodeado**. Hoy no lo llama nadie, así
+  que no hace daño; el daño sería que alguien lo cablee como fallback creyendo que sirve, porque
+  **confirmaría** la conclusión falsa. Se arregla o se borra, pero no se deja así.
+  **Lo que lo hace resoluble:** `createPayment` ya setea `external_reference: sessionId`, así que se
+  puede llegar al pago real sin el webhook. **No se implementa nada todavía**: es alcance de la Fase
+  1 y la fase abre con `/office-hours` + `/autoplan`, como manda la regla. Borrador en
+  `fases/FASE-1.md`.
