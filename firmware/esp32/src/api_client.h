@@ -16,12 +16,37 @@
 // NTP mínimo: rechazamos requests hasta tener una hora creíble.
 #define MIN_VALID_EPOCH_SECONDS 1700000000ULL
 
-// Cadena de certificados raíz. Default: ISRG Root X1 (Let's Encrypt).
-// IMPORTANTE: si el dominio queda detrás de Cloudflare, la cadena la firma
-// Cloudflare y hay que pasar ESA raíz por build flag:
-//   build_flags = -DTLS_ROOT_CA='"-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"'
+// Anclas de confianza TLS. Es un BUNDLE de DOS raices, no una sola:
+//   1) GTS Root R4   -> lo que firma HOY la cadena de *.insolvadev.com. El dominio sale
+//                       por Cloudflare, y el certificado lo termina el borde de
+//                       Cloudflare, NO el origen.
+//   2) ISRG Root X1  -> Let's Encrypt, lo que usa casi cualquier hosting cloud.
+// POR QUE DOS (ADR-016 + ADR-020): hoy el backend vive en el server local detras de
+// Cloudflare y manana se muda a la nube. Con el hostname fijo esa mudanza es un cambio
+// de DNS; pero si aca hubiera UNA sola raiz, la mudanza romperia el TLS y obligaria a ir
+// fisicamente hasta la maquina, en Ushuaia, a abrir la caja IP65 y re-flashear.
+// Con las dos, no se toca la placa. mbedtls_x509_crt_parse acepta PEMs concatenados,
+// asi que setCACert() los toma juntos como dos anclas independientes.
+// VERIFICADO el 2026-09-04 contra hidro-api.insolvadev.com:
+//   solo ISRG -> "Verify return code: 20 (unable to get local issuer certificate)"
+//   el bundle -> "Verify return code: 0 (ok)"
+// Se puede sobreescribir por build flag si cambia el proveedor de certificados:
+//   build_flags = -DTLS_ROOT_CA='"<el PEM completo, con saltos escapados>"'
 #ifndef TLS_ROOT_CA
 static const char ROOT_CA[] PROGMEM = R"EOF(
+-----BEGIN CERTIFICATE-----
+MIICCTCCAY6gAwIBAgINAgPlwGjvYxqccpBQUjAKBggqhkjOPQQDAzBHMQswCQYD
+VQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2VzIExMQzEUMBIG
+A1UEAxMLR1RTIFJvb3QgUjQwHhcNMTYwNjIyMDAwMDAwWhcNMzYwNjIyMDAwMDAw
+WjBHMQswCQYDVQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2Vz
+IExMQzEUMBIGA1UEAxMLR1RTIFJvb3QgUjQwdjAQBgcqhkjOPQIBBgUrgQQAIgNi
+AATzdHOnaItgrkO4NcWBMHtLSZ37wWHO5t5GvWvVYRg1rkDdc/eJkTBa6zzuhXyi
+QHY7qca4R9gq55KRanPpsXI5nymfopjTX15YhmUPoYRlBtHci8nHc8iMai/lxKvR
+HYqjQjBAMA4GA1UdDwEB/wQEAwIBhjAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQW
+BBSATNbrdP9JNqPV2Py1PsVq8JQdjDAKBggqhkjOPQQDAwNpADBmAjEA6ED/g94D
+9J+uHXqnLrmvT/aDHQ4thQEd0dlq7A/Cr8deVl5c1RxYIigL9zC2L7F8AjEA8GE8
+p/SgguMh1YQdc4acLa/KNJvxn7kjNuK8YAOdgLOaVsjh4rsUecrNIdSUtUlD
+-----END CERTIFICATE-----
 -----BEGIN CERTIFICATE-----
 MIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAw
 TzELMAkGA1UEBhMCVVMxKTAnBgNVBAoTIEludGVybmV0IFNlY3VyaXR5IFJlc2Vh

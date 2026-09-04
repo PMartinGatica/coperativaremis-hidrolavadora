@@ -22,10 +22,13 @@
 
 // ---------- Backend ----------
 #ifndef HIDRO_API_BASE_URL
-// PENDING CLIENT DECISION: dominio productivo con HTTPS.
-// SOLO el host: sin "https://" y sin barra final (ej. "hidro.coop-remises.ar").
-// Si llegara a llevar esquema, api_client.h lo normaliza.
-#define HIDRO_API_BASE_URL "dominio.com"
+// Hostname FIJO y definitivo (ADR-020). NO se cambia al pasar a produccion.
+// Hoy resuelve al server local de Pablo (Cloudflare Tunnel -> Traefik -> contenedor);
+// cuando el sistema pase a la nube se re-apunta el DNS y el ESP32 ni se entera.
+// Cambiarlo aca obliga a recompilar y a ir FISICAMENTE hasta la maquina, en Ushuaia,
+// a abrir la caja IP65: por eso se fijo ANTES del primer deploy y no despues.
+// SOLO el host: sin "https://" y sin barra final. Si llevara esquema, api_client.h lo normaliza.
+#define HIDRO_API_BASE_URL "hidro-api.insolvadev.com"
 #endif
 #define HIDRO_API_PORT 443
 

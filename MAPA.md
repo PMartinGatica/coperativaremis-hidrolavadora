@@ -24,7 +24,7 @@ rutas de este MAPA son relativas a esa carpeta. Repo:
 | `npm run build` | shared → state-machine → api → web |
 | `npm run start:api` | API + simulador ESP32 en `:3020` |
 | `npm run dev:web` | front en `:5173` (proxy `/api` → `:3020`) |
-| `npm test` | 46 tests (state-machine + api) |
+| `npm test` | 58 tests (shared 4 + state-machine 6 + api 48) |
 | `npm run verify` / `node scripts/verify-e2e.mjs` | E2E en vivo contra el sistema corriendo |
 | `npm run build:firmware` | `pio run -d firmware/esp32` — **la puerta (a) si tocás `firmware/`** |
 | `npm run check:firmware` | pre-chequeo estático por grep. **NO sustituye al de arriba** (daba OK con el firmware sin compilar) |
@@ -50,6 +50,7 @@ rutas de este MAPA son relativas a esa carpeta. Repo:
 | Web — admin | `apps/web/src/admin/` | `AdminApp.tsx` + `pages/` (Dashboard, Machines, Vehicles, Sessions, Payments, Logs, Settings) |
 | Firmware | `firmware/esp32/src/` | `main.cpp` (loop + timer local), `api_client.h` (HTTPS + HMAC + **root CA**), `app_config.h` (pines, URLs, tiempos), `peripherals.h` (relay/LED/pulsador), `nvs_store.h`, `hidro_state.h` |
 | Tests | `apps/api/tests/` | `e2e.test.ts`, `concurrency.test.ts`, `payment-flow.test.ts`, `plates.test.ts`, `device-security.test.ts`, `offline.test.ts`, `simulator-resilience.test.ts`, `admin.test.ts`, `helpers.ts` |
+| Mensajes a terceros | `mensajes/` | `mensaje-tecnicos.md` (compra + montaje + los 3 datos que bloquean la puesta en marcha), `mensaje-dueno.md` (ADR-007 + reembolsos + cuenta de MP). Listos para copiar a WhatsApp |
 | Scripts | `scripts/` | `verify-e2e.mjs` (E2E vivo), `browser-e2e.mjs` (Edge headless), `check-render.mjs` |
 
 ## Dónde vive el modelo de datos
