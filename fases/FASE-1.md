@@ -1,9 +1,18 @@
 # FASE-1 — Reconciliación de pagos · Mundo: HIDRO SELF-SERVICE
 
-> **BORRADOR de alcance, escrito el 2026-09-04.** Todavía NO pasó por `/office-hours` + `/autoplan`,
-> que son obligatorios antes de escribir una línea de código (regla innegociable del Universo).
-> Este documento es la materia prima de esa sesión, no su reemplazo: existe para que el pipeline
-> arranque con el problema ya medido en vez de con una intuición.
+> **Pasó por `/office-hours` el 2026-09-05.** El alcance de abajo es el BORRADOR original — quedó
+> desactualizado en dos puntos, corregidos en el design doc (`docs/designs/reconciliacion-pagos.md`,
+> APPROVED, revisado 2 rondas por agente adversarial, 10/10) y en ADR-027/028/029:
+> 1. **Se agrega** (no estaba acá): aprobación manual de mesa de entrada como núcleo de la fase —
+>    la hidrolavadora está dentro de un taller 24hs, y el diagnóstico forzado reveló que mesa de
+>    entrada puede VER el pago pero no HABILITAR la sesión. Mecanismo: ID real de pago de MP, nunca
+>    un checkbox ciego.
+> 2. **Se saca** (estaba en "Entra" abajo): TRUST_PROXY (ADR-022), el cupo diario (ADR-024) y las
+>    guardas de arranque (ADR-025/026) pasan a **Fase 1.5** — dominios de falla independientes que
+>    no comparten código con la máquina de estados de pagos.
+>
+> Próximo paso: `/autoplan` sobre el design doc, no sobre este borrador. Este archivo queda como
+> registro de cómo se midió el problema originalmente.
 
 ## Por qué esta fase y no otra
 Es el único bloque grande que **no depende de una decisión ajena**. El ADR-007 (identidad de la

@@ -365,3 +365,37 @@
   (firmar con secreto vacío tira error en `jsonwebtoken`, o sea que rompe ruidosamente el login del
   admin en vez de aceptar tokens falsos), pero la guarda no protege de lo que cree proteger. Entra al
   mismo arreglo.
+
+- **2026-09-05 — ADR-027 [DECISIÓN, /office-hours Fase 1]: alcance de la Fase 1 se recorta a
+  reconciliación de pagos pura; ADR-022/024/025/026 pasan a Fase 1.5.** El borrador original de
+  `fases/FASE-1.md` mezclaba el fix de reconciliación con TRUST_PROXY (ADR-022), el conteo del cupo
+  diario contra fallas del sistema (ADR-024) y las guardas de arranque en producción (ADR-025/026).
+  Segunda opinión de Codex (vía `/office-hours`): son dominios de falla independientes que no
+  comparten código con la máquina de estados de pagos, y mezclarlos agranda el diff que pasa por
+  `/review` + `/cso` sin necesidad. Confirmado por el usuario. **ADR-025/026 ya NO son "alcance de
+  la Fase 1" pese a lo que dice su propio texto — quedan documentados y listos para Fase 1.5, sin
+  reabrir el diagnóstico.** Design doc: `docs/designs/reconciliacion-pagos.md`.
+
+- **2026-09-05 — ADR-028 [DECISIÓN, /office-hours Fase 1]: la Fase 1 incorpora aprobación manual de
+  mesa de entrada como núcleo, no como extra.** Diagnóstico forzado (Q2 de `/office-hours`): la
+  hidrolavadora está dentro de un taller que atiende 24hs, y mesa de entrada puede VER en la base si
+  el cliente pagó pero hoy no tiene forma de HABILITAR una sesión trabada (`adminService.ts` solo
+  tiene listados y `emergencyStop`, nada que autorice). Mecanismo elegido: mesa de entrada tipea el
+  ID real de pago de Mercado Pago (nunca un checkbox ciego); el backend lo valida con
+  `getPaymentById`, confirma `external_reference` e importe, y recién ahí llama a `processApproval()`
+  — el mismo camino único que usa el webhook. Identidad y auditoría de quién aprueba reusan
+  `admin_users` + `insertAudit(actor: email)`, que ya existen (`db/schema.ts:202-208`,
+  `adminService.ts:66-74`) — no hace falta construir identidad nueva.
+
+- **2026-09-05 — ADR-029 [DECISIÓN, /office-hours Fase 1]: el fix reusa `processApproval()` como
+  punto único de aprobación; no se construye un comando nuevo.** Codex (segunda opinión) propuso un
+  `confirmPayment()` canónico para unificar webhook tardío + aprobación manual. Verificado en
+  `paymentService.ts:52-60`: esa función ya existe (`processApproval`, "PUNTO ÚNICO de aprobación de
+  pagos", idempotente por `UNIQUE` + `FOR UPDATE`) y ya maneja pago tardío sobre sesión terminal
+  (`paymentService.ts:271-279`) — pero solo lo registra, no recupera la sesión. Approach elegido:
+  extender esa rama con una tabla exhaustiva de recuperabilidad por los 8 `SessionStatus` terminales
+  (`state-machine/src/index.ts:26-33`); de los 8, solo `PAYMENT_EXPIRED` es recuperable por esta vía
+  — los otros 7 (`PAYMENT_FAILED`, `MACHINE_OFFLINE`, `AUTHORIZATION_EXPIRED`, `SESSION_INTERRUPTED`,
+  `EMERGENCY_STOP`, `DEVICE_ERROR`, `FINISHED`) quedan explícitamente excluidos y documentados por
+  qué. Design doc revisado 2 rondas por agente adversarial independiente (10/10):
+  `docs/designs/reconciliacion-pagos.md`. Próximo paso: `/autoplan`.

@@ -44,10 +44,12 @@ respuestas del dueño. Lo que falta está convertido en pedidos escritos o en la
   WiFi de la cooperativa, hay que abrir la caja (deuda, se decide en la Fase 1).
 
 ## Próximo paso concreto
-1. **[HUMANO]** App en Coolify → `docs/deploy-coolify.md`. Único paso para tener el backend vivo.
-2. **[HUMANO]** Respuestas de `mensajes/`: técnicos (relay + contactor) y dueño (ADR-007 + reembolso
+1. **`/office-hours` de la Fase 1 hecho (2026-09-05).** Design doc APPROVED, revisado 2 rondas por
+   agente adversarial (10/10): `docs/designs/reconciliacion-pagos.md`. Alcance recortado a
+   reconciliación pura + aprobación manual de mesa de entrada (ADR-027/028/029); TRUST_PROXY/cupo
+   diario/guardas de arranque pasan a Fase 1.5. **Siguiente: `/autoplan` sobre ese doc, después Build.**
+2. **[HUMANO]** App en Coolify → `docs/deploy-coolify.md`. Único paso para tener el backend vivo.
+3. **[HUMANO]** Respuestas de `mensajes/`: técnicos (relay + contactor) y dueño (ADR-007 + reembolso
    + cupo diario + cuenta de MP).
-3. **[HUMANO]** Cuenta de desarrollador de MP + usuarios de prueba (ADR-018).
-4. **Abrir la Fase 1** con `/office-hours` + `/autoplan` sobre `fases/FASE-1.md`. Único bloque grande
-   que no depende de nadie más.
+4. **[HUMANO]** Cuenta de desarrollador de MP + usuarios de prueba (ADR-018).
 5. Puesta en marcha del hardware con Pablo presente, timer viejo como red.
