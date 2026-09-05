@@ -1,0 +1,153 @@
+{
+  "_meta": {
+    "descripcion": "Datos del Mundo HIDRO SELF-SERVICE para el dashboard. Vive ACA, dentro del Mundo, no en Madre: cada Mundo tiene su estado, su ADR y sus archivos de periodo propios (regla de Pablo, 2026-09-05).",
+    "actualizado": "2026-09-05",
+    "estados_posibles": [
+      "idea",
+      "en-proceso",
+      "testeando",
+      "terminado",
+      "en-produccion"
+    ],
+    "fases_cadencia": [
+      "1-manual",
+      "2-revision-previa",
+      "3-piloto-automatico",
+      "4-autonomia-supervisada"
+    ],
+    "sprint_gstack": [
+      "think",
+      "plan",
+      "build",
+      "review",
+      "test",
+      "ship",
+      "reflect"
+    ],
+    "operadores": [
+      "windows",
+      "hermes"
+    ]
+  },
+  "mundo": {
+    "id": "hidro-self-service",
+    "nombre": "HIDRO SELF-SERVICE (hidrolavadora QR)",
+    "carpeta": "mundos/hidro-self-service/",
+    "repo_github": "https://github.com/PMartinGatica/coperativaremis-hidrolavadora",
+    "estado": "en-proceso",
+    "arranque": "RETROFIT",
+    "stack": "Monorepo npm workspaces (excepción: no pnpm) · Express 4 + TS strict + drizzle-orm + PGlite/Postgres (apps/api) · React 19 + Vite 6 + Tailwind 4 (apps/web) · packages/shared + state-machine · firmware ESP32 en PlatformIO/C++ · Mercado Pago tras interfaz PaymentProvider (hoy en demo) · Vitest",
+    "despliegue": "HOSTNAME DEFINITIVO: hidro-api.insolvadev.com (ADR-020/021), fijado en el firmware -- no cambia al pasar a produccion. DESARROLLO: server local de Pablo (Cloudflare Tunnel -> Traefik de Coolify -> contenedor). PRODUCCION: la nube por R8, y la mudanza se hace POR DNS sin re-flashear (ADR-019). INFRA MONTADA Y VERIFICADA el 2026-09-04: el tunel frigate-nvr resulto ser LOCAL (no administrable desde Zero Trust; Cloudflare ofrece migrarlo pero es IRREVERSIBLE y sirve las camaras, NO se toco). Se agrego una linea de ingress en /etc/cloudflared/config.yml -> http://localhost:80, el mismo target que sm y studio, con backup previo; DNS = CNAME Proxied al tunel. SIN segundo tunel: R1 intacta. Camino probado ejecutando: curl al dominio devuelve el 404 de TRAEFIK (Go http.NotFound, con x-content-type-options: nosniff), no el http_status:404 del tunel -> la cadena DNS -> Cloudflare -> tunel -> Traefik esta entera y solo falta la app en Coolify. Guia lista en docs/deploy-coolify.md. Vercel DESCARTADO para la API (ADR-017).",
+    "fase_proyecto": "(2026-09-04) El software esta tan avanzado como puede estar SIN hardware y SIN dominio. El firmware COMPILA (pio run SUCCESS, RAM 14.4%, Flash 72.3%), 58 tests verdes, tsc limpio, npm audit sin HIGH, Docker levanta y responde /health, repo propio privado con commits bc5f744 + b6560bb pusheados. Lo que queda depende de tres cosas de afuera y ya estan escritas como pedidos: mensajes/mensaje-tecnicos.md (compra y montaje) y mensajes/mensaje-dueno.md (ADR-007 + reembolsos + cuenta de MP). REPARTO DE TRABAJO (ADR-014): Pablo hace software y firmware, los tecnicos hacen hardware y electrico. DOS RIESGOS ENCONTRADOS HOY, los dos bloquean la puesta en marcha: (1) ADR-016 VERIFICADO con openssl -- el firmware pinnea ISRG Root X1 y la cadena real de insolvadev.com es WE1 <- GTS Root R4 <- GlobalSign, o sea que el ESP32 rechazaria el TLS en el 100% de los requests con el sintoma mudo 'no conecta'; se arregla por -DTLS_ROOT_CA (ya soportado) y se pasa a bundle de 2 raices. (2) ADR-015 -- RELAY_ACTIVE_LEVEL HIGH contra un modulo relay activo-bajo hace que relay.begin() cierre el relay y EL MOTOR ARRANQUE SOLO EN EL BOOT: fail-safe invertido. Probar polaridad en banco sin contactor + resistencia de estado seguro en GPIO 26. Hardware objetivo fijado (ADR-015): ESP32-WROOM-32 4 MB (board=esp32dev); quedan excluidos C3/S2/S3/C6/H2.",
+    "fase_cadencia": "1-manual",
+    "sprint_actual": "plan",
+    "skill_gstack_activa": null,
+    "tiene_ui": true,
+    "gate": {
+      "test_automatico": true,
+      "test_manual": false,
+      "seguridad": false
+    },
+    "salud": "verde",
+    "conexiones": [
+      {
+        "nombre": "Mercado Pago (Checkout Pro + webhook)",
+        "estado": "pendiente"
+      },
+      {
+        "nombre": "ESP32 real (HTTPS + HMAC por dispositivo) -- TLS resuelto: bundle GTS Root R4 + ISRG Root X1 verificado contra el dominio real",
+        "estado": "pendiente"
+      },
+      {
+        "nombre": "Simulador de ESP32 in-process (DEMO)",
+        "estado": "up"
+      },
+      {
+        "nombre": "Postgres (PGlite embebido en demo; server real sin definir)",
+        "estado": "pendiente"
+      }
+    ],
+    "proximo_paso": "(1) [HUMANO] crear la app en Coolify siguiendo docs/deploy-coolify.md -- unico paso que falta para tener el backend vivo. (2) [HUMANO] esperar respuestas de los 2 mensajes enviados el 2026-09-04 (tecnicos: modulo de relay + contactor; dueno: ADR-007 + politica de reembolso + cuenta de MP). (3) [HUMANO] cuenta de desarrollador de Mercado Pago + usuarios de prueba (ADR-018). (4) Verificar TRUST_PROXY apenas haya app desplegada (ADR-022). (5) Abrir la Fase 1 con /office-hours + /autoplan; alcance candidato: reconciliacion de pagos, politica de reembolso y CF-Connecting-IP. (6) Puesta en marcha del hardware con Pablo presente.",
+    "bloqueos": [
+      "[ANTES DE DESPLEGAR] ADR-025/026: NODE_ENV=production no es opcional -- sin el, TEST_SPEED_FACTOR=10 hace que el lavado de 180 s dure 18 s y queda un ESP32 simulado corriendo en el server publico. La guia de deploy lo omitia (error propio, corregido). Ademas, sin guarda: admin por defecto admin@hidro.local con clave conocida y patentes demo remis $500 se siembran tambien en produccion. Mitigado con SEED_DEMO=false + clave propia; el arreglo real es Fase 1.",
+      "[PIERDE PLATA] ADR-023: a los 120 s el barrido marca PAYMENT_EXPIRED sin preguntarle a Mercado Pago, y ese estado es TERMINAL (verificado ejecutando: TRANSITIONS vacio), asi que un webhook tardio ya no recupera nada. Los 120 s corren desde que el cliente carga la patente, no desde que abre el checkout: se dispara en un pago lento normal. Alcance de la Fase 1, borrador en fases/FASE-1.md.",
+      "[ATADO AL DUENO] ADR-024: el limite diario cuenta SESSION_INTERRUPTED y MACHINE_OFFLINE, o sea que el cliente paga con su cupo las fallas del sistema; el credito automatico que se le ofrecio es inservible si el lavado fallido ya quemo el cupo. Agregado enviado en mensajes/mensaje-dueno.md.",
+      "[HUMANO] ADR-007 abierta: la patente no prueba identidad (cualquiera copia la de un remis y lava por $500 en vez de $8.000). Bloquea definir las fases. Mensaje al dueno enviado el 2026-09-04, esperando respuesta.",
+      "[HUMANO] Falta crear la app en Coolify (repo + Dockerfile + puerto 3020 + dominio + env). Es lo unico que falta para que el backend este vivo; la red ya esta montada y probada. Guia: docs/deploy-coolify.md.",
+      "[BLOQUEA MONTAJE] ADR-015: falta saber si el modulo relay que compren es activo-alto o activo-bajo. Con RELAY_ACTIVE_LEVEL equivocado el motor arranca solo en el boot. Mensaje a los tecnicos enviado, esperando respuesta.",
+      "[ABIERTA] ADR-022: hay 3 proxies delante (Cloudflare -> cloudflared -> Traefik) y TRUST_PROXY=1 puede hacer que req.ip sea una IP de Cloudflare, con lo cual express-rate-limit mete a todos los clientes en la misma cuota. Verificar apenas la app este desplegada.",
+      "[STOP-HUMANO] Energizar el relay contra hardware real: compilar no es funcionar. Con Pablo presente y el timer electrico viejo como red.",
+      "Sin reconciliacion de pagos: si Mercado Pago pierde el webhook, el cliente pago y no pasa nada. getPayment() consulta una preference y siempre da PENDING; refundPayment() es un stub."
+    ],
+    "stop_humano": [
+      "Energizar el relay contra hardware real por primera vez (con Pablo presente y el timer eléctrico viejo todavía instalado como red)",
+      "Retirar el timer eléctrico existente",
+      "Pasar PAYMENT_PROVIDER de demo a mercadopago (es el momento en que se empieza a cobrar plata real)",
+      "Cambiar tarifas o el límite diario en producción",
+      "Rotar el secret de un dispositivo en producción (deja el ESP32 sin poder autenticarse hasta re-flashearlo)"
+    ],
+    "deploy": {
+      "url_produccion": "https://hidro-api.insolvadev.com",
+      "ultimo_deploy": null
+    },
+    "operador_ultimo": "windows",
+    "tokens_acumulados": 0,
+    "costo_usd": 0,
+    "fecha_creacion": "2026-09-03",
+    "deadline": null,
+    "ultima_actividad": "2026-09-05",
+    "nota_universo": "Pago por QR para una hidrolavadora autoservicio de una cooperativa de remises de Ushuaia: patente -> tarifa ($500 remis / $2.000 socio / $8.000 particular, lo no registrado cae en la cara) -> Mercado Pago -> luz verde -> pulsador fisico -> 180 s. Maximo 2 lavados/dia por patente. Invariante duro: el pago NUNCA enciende la hidrolavadora, y el timer de 180 s lo cuenta el ESP32 localmente para que corte aunque se caiga internet. Codigo y memoria conviven en la carpeta del Mundo, con repo propio privado (ADR-012). EL BUILD LO HACE CLAUDE (ADR-008 revierte el ADR-005 'Build = DeepSeek'); gstack de punta a punta como el resto de los Mundos. Reparto con el cliente: Pablo hace software y firmware, los tecnicos hacen hardware y electrico (ADR-014). Slug de gstack: PMartinGatica-hidro-self-service.",
+    "historial_estados": [
+      {
+        "fecha": "2026-09-01",
+        "estado": "en-proceso",
+        "nota": "Reunión con el dueño: flujo definitivo aprobado (patente → tarifa → pago → luz verde → pulsador → 180 s), las 3 tarifas y el límite de 2 lavados/día por patente. Bloque 00 (QR dinámico de MP) ya desplegado por Pablo y funcionando al 100%."
+      },
+      {
+        "fecha": "2026-09-03",
+        "estado": "en-proceso",
+        "nota": "Registrado como sexto Mundo del Universo (RETROFIT, gate de los 3 SÍ leído como 3 SÍ). Clonado MUNDO-TEMPLATE con CLAUDE/ESTADO/MAPA/ADR/cadencia/conexiones/skills/storyline propios + slug fijado en .claude/settings.json. Primera /cso: 46/46 tests y tsc limpios, pero el firmware no conecta (3 bloqueantes) y falta la guarda dura del relay. Lección que se llevó al ADR del Universo: un simulador no valida el artefacto que se despliega."
+      },
+      {
+        "fecha": "2026-09-03",
+        "estado": "en-proceso",
+        "nota": "Ronda 1 de correcciones aplicada por DeepSeek y VERIFICADA: 48/48 tests (eran 46), tsc limpio, npm audit de 1 high a 0 high, root CA confirmado con openssl. Cerrados los 3 bloqueantes del firmware y la guarda dura del relay. Quedan 2 rotas: el fix de TZ tiene el signo invertido (el día arranca 18:00 Ushuaia) y el Dockerfile construye pero el contenedor muere con ERR_MODULE_NOT_FOUND porque no copia packages/. Prompt 2 escrito."
+      },
+      {
+        "fecha": "2026-09-04",
+        "estado": "en-proceso",
+        "nota": "Ronda 2 de DeepSeek verificada y correcta. EL FIRMWARE COMPILA POR PRIMERA VEZ tras arreglar el lib_deps que faltaba (ArduinoJson), la colision de macro y dos ternarios sin tipo comun: cierra la puerta (a) del ADR-006. Repo bajo git (123 archivos limpios, .pio ignorado). ADR-008: el Build pasa de DeepSeek a Claude, revierte el ADR-005 (DeepSeek no podia verificar lo que entregaba: sin Docker ni PlatformIO, cada ronda cerraba en revisado-por-lectura). PlatformIO queda como requisito del Mundo (ADR-011)."
+      },
+      {
+        "fecha": "2026-09-04",
+        "estado": "en-proceso",
+        "nota": "Codigo consolidado dentro de mundos/ como los otros 4 Mundos (ADR-012, supersede ADR-004) y PRIMER COMMIT + PUSH: bc5f744, 138 archivos, 21.966 lineas, rama main, repo privado coperativaremis-hidrolavadora. Cierra la deuda #1. En la mudanza apps/web/node_modules y dist quedaron atras (los tenia tomados un esbuild colgado) y se regeneraron con npm install. Verificado en la nueva ubicacion: tsc limpio en api y web. Nota: el repo es PRIVADO y eso importa, adentro viajan el presupuesto al cliente, contexto.md y el ADR-007 que documenta un agujero de tarifa explotable."
+      },
+      {
+        "fecha": "2026-09-04",
+        "estado": "en-proceso",
+        "nota": "Sesion de handoff a terceros. ADR-014: reparto de trabajo (Pablo software+firmware, tecnicos hardware+electrico) y se escriben los 2 mensajes de WhatsApp en mensajes/. ADR-015: hardware objetivo ESP32-WROOM-32 4 MB (board=esp32dev, binario al 72,3% de la particion de app), quedan excluidos C3/S2/S3/C6/H2; y riesgo encontrado: RELAY_ACTIVE_LEVEL HIGH contra un modulo activo-bajo enciende el motor en el boot. ADR-016 VERIFICADO con openssl: la cadena real de insolvadev.com es GTS Root R4, no ISRG Root X1 -- el firmware no habria conectado nunca detras de Cloudflare. ADR-017: Vercel descartado para la API (Express de proceso largo + PGlite en disco + polling cada 2 s + Hobby no comercial); va al server con Coolify bajo subdominio de insolvadev.com. ADR-018: MP se prueba con cuenta de desarrollador propia y usuarios de prueba; la cuenta real de la cooperativa entra al final porque la plata tiene que caer en la de ellos."
+      },
+      {
+        "fecha": "2026-09-04",
+        "estado": "en-proceso",
+        "nota": "Aclaracion de Pablo que acota el ADR-017: el server de Hermes es una PC local suya, no un VPS -- lo usa para no pagar VPS ni Vercel mientras desarrolla, igual que el Supabase self-hosted. ADR-019: server local = desarrollo, demo y puesta en marcha; NUNCA la maquina en la calle cobrando (R8, y la memoria ya registra que el server se freezea). ADR-020, hallazgo que lo destraba: en el firmware TODA la configuracion es de tiempo de compilacion y NVS solo guarda el estado de sesion (valid/sess/auth/dur/deadline/lastTick/runStart), asi que cambiar el dominio = recompilar + ir a Ushuaia a abrir la caja IP65 justo al pasar a produccion. Se fija un hostname propio estable desde hoy y la migracion se hace por DNS. Corolario: el bundle de 2 raices del ADR-016 pasa de recomendable a obligatorio, porque el server sale por Cloudflare (GTS Root R4) y la nube por Lets Encrypt (ISRG Root X1). Deuda anotada, no resuelta: las credenciales de WiFi tambien son de compilacion, asi que si la cooperativa cambia el router hay que abrir la caja; el arreglo es aprovisionamiento por NVS y se decide en la Fase 1."
+      },
+      {
+        "fecha": "2026-09-04",
+        "estado": "en-proceso",
+        "nota": "INFRA MONTADA Y VERIFICADA (ADR-021). Hostname definitivo hidro-api.insolvadev.com fijado en el firmware. El tunel frigate-nvr resulto LOCAL, no administrable desde Zero Trust: Cloudflare ofrecia migrarlo pero la migracion es IRREVERSIBLE y el tunel sirve las camaras, asi que no se toco; se agrego la ruta editando /etc/cloudflared/config.yml con backup previo (-> http://localhost:80, el mismo target que sm y studio, que rutean por Host header en Traefik) y CNAME Proxied al tunel. Sin segundo tunel: R1 intacta. Camino probado ejecutando: el 404 que devuelve el dominio es el de Traefik, no el del tunel. ADR-016 CERRADO midiendo el fallo real antes de arreglarlo: solo ISRG Root X1 -> Verify return code 20 (unable to get local issuer certificate); bundle GTS Root R4 + ISRG Root X1 -> 0 (ok). Las raices se extrajeron del almacen de confianza local (150 CAs), no de internet, y se verificaron los fingerprints; el de ISRG es identico al que ya tenia el firmware. pio run SUCCESS (Flash 72,3%, +768 B) y verificado que las 2 quedan en el .bin. Escrita docs/deploy-coolify.md. Hallazgo nuevo ADR-022: con 3 proxies delante, TRUST_PROXY=1 puede romper el rate limiting agrupando a todos los clientes bajo una IP de Cloudflare."
+      },
+      {
+        "fecha": "2026-09-04",
+        "estado": "en-proceso",
+        "nota": "Auditoria autonoma de los caminos donde se cruzan la plata y el motor, verificando por ejecucion. ADR-023: lo que el ESTADO llamaba falta de reconciliacion resulto ser peor que una ausencia -- el barrido escribe PAYMENT_EXPIRED sin consultar al proveedor y ese estado es terminal (TRANSITIONS.PAYMENT_EXPIRED = [], verificado contra el paquete compilado), asi que el sistema registra que no hubo pago y se prohibe corregirlo. Agravante: los 120 s corren desde sessions.createdAt, no desde que se abre el checkout, con lo cual se dispara en un pago lento normal. Resoluble porque createPayment ya setea external_reference = sessionId. ADR-024: el limite diario cuenta las fallas del sistema contra el cliente; se verifico que NO se compone con el ADR-023 (PAYMENT_EXPIRED no cuenta) -- hipotesis razonable que resulto falsa y quedo escrita. Verificado tambien SIN bug: la tarifa por defecto es whitelist, todo lo no registrado y habilitado cae en $8.000 (ADR-002 confirmado). Escrito fases/FASE-1.md como materia prima para /office-hours + /autoplan, con reembolsos explicitamente AFUERA del alcance porque esperan al dueno. Commits 7f5a131, 8f6123f, 350bcb3."
+      },
+      {
+        "fecha": "2026-09-05",
+        "estado": "en-proceso",
+        "nota": "Auditoria de seguridad del deploy, antes de exponerlo. ADR-025 (error propio): la guia docs/deploy-coolify.md omitia NODE_ENV=production y sugeria TEST_SPEED_FACTOR=10 mas DEVICE_SIMULATOR=true. Como todas las guardas cuelgan de isProd, esa combinacion hacia que el lavado de 180 s durara 18 s (el cliente paga $8.000 y recibe 18 segundos de agua) y dejaba un ESP32 simulado corriendo dentro del servidor publico, capaz de consumir autorizaciones en vez de la maquina real. Corregida. Leccion: una guia de deploy es codigo con otro nombre y su fuente de verdad es config.ts, no .env.example. ADR-026: las credenciales de admin tienen defaults conocidos que se siembran solos SIN guarda de produccion (a diferencia de JWT_SECRET), y SEED_DEMO viene en true tambien en produccion, sembrando AE100AA como remis $500. Entrar al admin y registrar patentes como remis es la via mas barata para vaciar el negocio, sin tocar el hardware. Mitigado en la guia; el arreglo real (que el arranque FALLE) entra a la Fase 1. Auditado tambien SIN bug: el camino al motor esta solido -- el pulsador valida la maquina, toma lock de fila y consume la autorizacion atomicamente, asi que doble pulsacion o replay no arrancan un segundo ciclo (ADR-001 confirmado)."
+      }
+    ]
+  }
+}

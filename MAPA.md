@@ -50,6 +50,8 @@ rutas de este MAPA son relativas a esa carpeta. Repo:
 | Web — admin | `apps/web/src/admin/` | `AdminApp.tsx` + `pages/` (Dashboard, Machines, Vehicles, Sessions, Payments, Logs, Settings) |
 | Firmware | `firmware/esp32/src/` | `main.cpp` (loop + timer local), `api_client.h` (HTTPS + HMAC + **root CA**), `app_config.h` (pines, URLs, tiempos), `peripherals.h` (relay/LED/pulsador), `nvs_store.h`, `hidro_state.h` |
 | Tests | `apps/api/tests/` | `e2e.test.ts`, `concurrency.test.ts`, `payment-flow.test.ts`, `plates.test.ts`, `device-security.test.ts`, `offline.test.ts`, `simulator-resilience.test.ts`, `admin.test.ts`, `helpers.ts` |
+| Memoria de checkpoint | raíz del Mundo | `ESTADO.md` (handoff, ≤40 líneas), `MAPA.md` (este archivo), `ADR.md` (append-only), **`dashboard-data.json`** y **`tokens.csv`** — los 5 se actualizan en CADA checkpoint. **Viven acá, NO en `Madre/docs/`**: cada Mundo tiene los suyos (regla de Pablo, 2026-09-05). El `MUNDO-TEMPLATE` no traía los dos últimos, por eso faltaban |
+| Fases | `fases/` | `FASE-1.md` (borrador de alcance: reconciliación de pagos + guardas de arranque) |
 | Mensajes a terceros | `mensajes/` | `mensaje-tecnicos.md` (compra + montaje + los 3 datos que bloquean la puesta en marcha), `mensaje-dueno.md` (ADR-007 + reembolsos + cuenta de MP). Listos para copiar a WhatsApp |
 | Scripts | `scripts/` | `verify-e2e.mjs` (E2E vivo), `browser-e2e.mjs` (Edge headless), `check-render.mjs` |
 
