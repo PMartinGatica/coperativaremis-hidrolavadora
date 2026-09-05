@@ -67,6 +67,11 @@ llegar al pago real sin el webhook**. La pieza existe; falta usarla.
   es inservible mientras el lavado fallido siga quemando el cupo del día. Las dos decisiones se
   toman juntas.
 
+- **Guardas de arranque en producción (ADR-025/026).** Que el arranque **falle** si `ADMIN_PASSWORD`
+  es el default, igual que ya hace con `JWT_SECRET`; que `seedDemo` sea `false` cuando `isProd`; y
+  arreglar la guarda de `JWT_SECRET`, que compara contra un valor que nunca puede ser el default.
+  Una mitigación que depende de que alguien se acuerde de poner una variable no es una guarda.
+
 ## No entra (obligatorio y específico)
 - **Reembolsos.** `refundPayment()` sigue siendo stub hasta que el dueño defina la política. Esta
   fase deja de *perder* pagos; no decide qué hacer con la plata cuando la máquina falló.

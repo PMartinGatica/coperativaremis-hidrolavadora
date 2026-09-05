@@ -31,6 +31,7 @@ migración es irreversible y el túnel también sirve las cámaras.
 ## Variables de entorno
 
 ```
+NODE_ENV=production
 API_PORT=3020
 API_HOST=0.0.0.0
 TRUST_PROXY=1
@@ -40,12 +41,38 @@ DATABASE_URL=
 PAYMENT_PROVIDER=demo
 JWT_SECRET=<generar: openssl rand -hex 32>
 DEVICE_AUTH_SECRET=<generar: openssl rand -hex 32>
-ADMIN_EMAIL=admin@hidro.demo
-ADMIN_PASSWORD=<poner una propia, no dejar la de ejemplo>
-DEVICE_SIMULATOR=true
-TEST_SPEED_FACTOR=10
+ADMIN_EMAIL=<tu mail>
+ADMIN_PASSWORD=<una clave propia, larga>
+SEED_DEMO=false
 DAILY_WASH_LIMIT=2
 ```
+
+### 🔴 `NODE_ENV=production` no es opcional: sin él se apagan TODAS las guardas
+
+Una versión anterior de esta guía lo omitía y además sugería `TEST_SPEED_FACTOR=10` y
+`DEVICE_SIMULATOR=true`. **Esa combinación era peligrosa** y quedó registrada en el ADR-025. `config.ts`
+calcula `isProd = nodeEnv === 'production'` y de ahí cuelgan todas las protecciones:
+
+| Sin `NODE_ENV=production` | Qué pasa |
+|---|---|
+| `TEST_SPEED_FACTOR` no se fuerza a 1 | con `10`, el lavado de **180 s dura 18 s**: el cliente paga $8.000 y recibe 18 segundos de agua |
+| `DEVICE_SIMULATOR` no se fuerza a `false` | corre un **ESP32 simulado dentro del servidor público**, que puede consumir autorizaciones en lugar de la máquina real |
+| La validación de `JWT_SECRET` no dispara | no frena un secreto de desarrollo |
+
+Contrapartida honesta: con `NODE_ENV=production` el **simulador queda apagado**, así que no vas a poder
+probar el ciclo completo sin hardware real desde este deploy. Eso es lo correcto: esto está expuesto a
+internet. Para probar con simulador, corré local, donde `NODE_ENV` no es `production`.
+
+### 🔴 `SEED_DEMO=false` y `ADMIN_PASSWORD` propia (ADR-026)
+
+Con los valores por defecto, el arranque siembra:
+- un admin **`admin@hidro.local` / `hidro-demo-2025`** — credenciales conocidas, sin ninguna guarda de
+  producción. Quien entre puede registrar patentes como `remis` (lavados a **$500** en vez de $8.000),
+  cambiar tarifas y rotar el secret del dispositivo, dejando la máquina sin poder autenticarse.
+- las patentes demo **`AE100AA` (remis, $500)** y **`AE200AA` (socio, $2.000)**.
+
+`SEED_DEMO` viene en `true` **también en producción**. Ponelo en `false` y cargá una `ADMIN_PASSWORD`
+propia antes del primer arranque.
 
 - `API_HOST=0.0.0.0` es **obligatorio**: con el default `127.0.0.1` el contenedor arranca pero es
   inalcanzable desde afuera.

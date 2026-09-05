@@ -17,6 +17,9 @@ respuestas del dueño. Lo que falta está convertido en pedidos escritos o en la
 - **TLS (ADR-016 cerrado):** solo ISRG → `return code 20`; bundle **GTS Root R4 + ISRG Root X1** →
   `0 (ok)`. Raíces del almacén local. `pio run` SUCCESS, las 2 verificadas dentro del `.bin`.
 - **Tarifa por defecto:** whitelist, todo lo no registrado cae en $8.000. ADR-002 confirmado, sin bug.
+- **El camino al motor está sólido** (auditado 05/09): el pulsador valida que la sesión sea de esa
+  máquina, toma lock de fila y consume la autorización atómicamente, así que doble pulsación o replay
+  no arrancan un segundo ciclo. Cierre e interrupción también validan máquina. ADR-001 confirmado.
 
 ## Riesgos abiertos (en orden de daño)
 - 💸 **ADR-023.** A los **120 s** el barrido marca `PAYMENT_EXPIRED` sin preguntarle a MP, y ese estado
@@ -28,6 +31,13 @@ respuestas del dueño. Lo que falta está convertido en pedidos escritos o en la
 - **ADR-024.** El límite diario cuenta `SESSION_INTERRUPTED`/`MACHINE_OFFLINE`: el cliente paga con su
   cupo las fallas del sistema, y eso vuelve inservible el crédito ofrecido al dueño (agregado ya
   escrito en `mensajes/`). Verificado que **no** se compone con el ADR-023.
+- 🔴 **ADR-025/026 (antes de desplegar).** `NODE_ENV=production` **no es opcional**: sin él no se
+  fuerza `TEST_SPEED_FACTOR=1` (con `10`, el lavado de 180 s **dura 18 s**) ni se apaga el simulador
+  de ESP32 dentro del server público. La guía de deploy lo omitía — **error propio, ya corregido**.
+  Y sin guarda: admin por defecto `admin@hidro.local`/`hidro-demo-2025` + patentes demo `AE100AA`
+  (remis $500) sembradas también en producción → entrar al admin y registrar patentes como remis es
+  la vía más barata para vaciar el negocio. Mitigado en la guía (`SEED_DEMO=false` + clave propia);
+  el arreglo real (que el arranque **falle**, como ya hace con `JWT_SECRET`) es Fase 1.
 - **ADR-022.** 3 proxies delante; `TRUST_PROXY=1` puede agrupar a todos en una cuota de rate limit.
 - `getPayment()` devuelve `PENDING` hardcodeado (trampa cargada); `refundPayment()` es stub.
 - El firmware compila pero **nunca corrió en hardware**. Config toda de compilación: si cambia el

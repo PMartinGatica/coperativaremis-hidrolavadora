@@ -329,3 +329,39 @@
   `SESSION_INTERRUPTED` y `MACHINE_OFFLINE` tienen que salir de `WASH_COUNTING_STATUSES`.
   **No se cambia nada todavía**: entra al alcance de la Fase 1, con la respuesta del dueño como
   entrada.
+
+- **2026-09-05 — ADR-025 [ERROR PROPIO, corregido]: la guía de deploy omitía `NODE_ENV=production` y
+  eso apagaba TODAS las guardas de producción.** `docs/deploy-coolify.md`, escrita ayer, listaba las
+  variables sin `NODE_ENV` y encima sugería `TEST_SPEED_FACTOR=10` y `DEVICE_SIMULATOR=true`.
+  `config.ts:83` calcula `isProd = nodeEnv === 'production'` y de ahí cuelga todo:
+  (1) `speed` solo se fuerza a `1` si `isProd` (`config.ts:103`) → con `10`, **el lavado de 180 s dura
+  18 s**: el cliente paga $8.000 y recibe 18 segundos de agua;
+  (2) `deviceSimulator: !isProd && ...` (`config.ts:127`) → queda un **ESP32 simulado corriendo dentro
+  del servidor público**, capaz de consumir autorizaciones en lugar de la máquina real;
+  (3) la validación de `JWT_SECRET` (`config.ts:97`) no dispara.
+  Corregido en la guía, con la contrapartida escrita: con `NODE_ENV=production` el simulador queda
+  apagado y no se puede probar el ciclo completo sin hardware desde ese deploy — que es lo correcto,
+  porque está expuesto a internet; para simulador, local.
+  **Lección:** una guía de deploy que enumera variables es código con otro nombre. Esta se escribió
+  mirando `.env.example` y `conexiones.md` en vez de mirar `config.ts`, que es donde viven las guardas
+  reales. La fuente de verdad de una guía de deploy es el archivo que lee el entorno, no la documentación.
+
+- **2026-09-05 — ADR-026 [HALLAZGO]: credenciales de admin por defecto y patentes demo se siembran
+  también en producción.** `config.ts:125-126` tiene `ADMIN_EMAIL` default `admin@hidro.local` y
+  `ADMIN_PASSWORD` default **`hidro-demo-2025`**, y `seed.ts:182-192` los siembra si no hay usuario.
+  **No existe ninguna guarda `isProd`** para esto, a diferencia de `JWT_SECRET`, que sí la tiene. Y
+  `seedDemo` (`config.ts:139`) viene en **`true` también en producción**, sembrando `DEMO_VEHICLES`:
+  `AE100AA` como **remis ($500)** y `AE200AA` como **socio ($2.000)**.
+  **Por qué importa:** quien conozca los defaults entra al admin y puede registrar cualquier patente
+  como `remis` — lavados a $500 en vez de $8.000 —, cambiar las tarifas, y rotar el secret del
+  dispositivo, que deja el ESP32 sin poder autenticarse hasta re-flashearlo (o sea, un viaje a la
+  máquina). Es la vía más barata para vaciar el modelo de negocio, y no requiere tocar el hardware.
+  **Mitigación inmediata:** `SEED_DEMO=false` + `ADMIN_PASSWORD` propia, ya en la guía.
+  **Arreglo real, alcance de la Fase 1:** que el arranque **falle** en producción si `ADMIN_PASSWORD`
+  es el default, igual que ya hace con `JWT_SECRET`; y que `seedDemo` sea `false` por defecto cuando
+  `isProd`. Una mitigación que depende de que alguien se acuerde de poner una variable no es una guarda.
+  **Nota sobre `JWT_SECRET`:** su guarda compara contra `'dev-only-change-me'`, pero el default real es
+  `''` (`config.ts:96`), así que ese `if` **nunca puede dispararse por el default**. No es explotable
+  (firmar con secreto vacío tira error en `jsonwebtoken`, o sea que rompe ruidosamente el login del
+  admin en vez de aceptar tokens falsos), pero la guarda no protege de lo que cree proteger. Entra al
+  mismo arreglo.
