@@ -399,3 +399,49 @@
   `EMERGENCY_STOP`, `DEVICE_ERROR`, `FINISHED`) quedan explícitamente excluidos y documentados por
   qué. Design doc revisado 2 rondas por agente adversarial independiente (10/10):
   `docs/designs/reconciliacion-pagos.md`. Próximo paso: `/autoplan`.
+
+- **2026-09-05 — ADR-030 [DECISIÓN, `/autoplan` Fase 1]: la recuperación de
+  `PAYMENT_EXPIRED` se guarda por recencia, no por liveness — y sin locking simétrico
+  inventado.** El review de ingeniería (subagente Claude + Codex, hallazgo idéntico de
+  forma independiente) encontró que mi primera versión del fix tenía una falla real:
+  `uq_sessions_active_machine` solo protege si la otra sesión de la misma máquina sigue
+  **activa** — si ya llegó a un estado terminal (ej. `FINISHED`), el índice no dispara y
+  la recuperación tendría éxito en silencio, dejando una autorización viva para un
+  cliente que ya no está. Corrección: (1) caso "otra sesión sigue activa" — el índice
+  único ya serializa esto solo (Postgres lo aplica sin locking de la app); solo hace
+  falta capturar la violación en vez de dejarla salir como 500 crudo → `'machine_occupied'`.
+  (2) caso "otra sesión ya terminó" — chequeo `EXISTS` por recencia
+  (`idx_sessions_machine_created`, `createdAt >= A.createdAt`, ya existente, sin índice
+  nuevo) → `'machine_used_since'`. Codex corrigió además: `createSessionWithPayment`
+  bloquea por **patente** (`pg_advisory_xact_lock`), no por máquina — un locking
+  simétrico del lado de la recuperación no serializaba nada, porque el creador nunca
+  toma ese lock. La ventana TOCTOU angosta que queda (crear una sesión nueva en el
+  instante exacto entre el chequeo y la escritura de la recuperación) se documenta como
+  riesgo residual aceptado en `TODOS.md`, no se cierra ahora — cerrarla del todo
+  requeriría tocar `createSessionWithPayment`, fuera del blast radius de esta fase. La
+  consulta a MP se mueve fuera de cualquier transacción (igual que ya hace
+  `webhookRoutes.ts`) — Codex señaló que hacerla dentro de la transacción de recuperación
+  era un anti-patrón real.
+
+- **2026-09-05 — ADR-031 [DECISIÓN, `/autoplan` Fase 1]: dos riesgos de seguridad
+  resueltos por el usuario en el Final Gate, no auto-decididos por el pipeline.**
+  (1) Cuando se rechaza una recuperación porque la máquina ya se usó para otro cliente
+  (`machine_used_since`), el cliente original pagó y queda sin lavado — Codex objetó que
+  "queda como métrica" no es una resolución para esa plata. **Decisión: se deja solo
+  como métrica consultable**, consistente con la premisa 5 (reembolsos son política
+  pendiente del dueño, confirmada dos veces en `/office-hours`) — no se inventa política
+  de reembolso ni cola de escalamiento nueva. (2) La vía manual de aprobación puede
+  activarse horas después del pago, cuando el cliente ya no está — la autorización nueva
+  que se abre no tiene chequeo de identidad (el pulsador acepta a cualquiera presente).
+  Hallado de forma independiente por el subagente Eng Y por Codex — señal fuerte.
+  **Decisión: se acepta el riesgo residual**, mismo criterio de confianza que ya aplica
+  hoy a la llave física del mecánico (tampoco verifica identidad) — no se agrega un
+  campo de "confirmar presencia" a la Fase 1. Ambas decisiones documentadas como
+  aceptación explícita del usuario, no como huecos sin ver.
+
+- **2026-09-05 — ADR-032 [DECISIÓN, `/autoplan` Fase 1]: timeout 120s → 600s (10 min)
+  se envía como default de esta fase, no como pregunta abierta para el dueño.** El
+  review de CEO encontró que dejar el valor del timeout como "pregunta abierta,
+  bloqueado en el dueño" invertía la relación esfuerzo/impacto: es el fix más barato y
+  de mayor apalancamiento de toda la fase, y es un parámetro revisable, no una política
+  de negocio inventada. El dueño puede ajustarlo después sin que eso bloquee el Build.
