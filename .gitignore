@@ -27,3 +27,6 @@ test-results/
 
 # build del firmware (PlatformIO)
 .pio/
+
+# reportes locales de /cso (nunca al repo: quedan solo en la máquina que corrió el audit)
+.gstack/

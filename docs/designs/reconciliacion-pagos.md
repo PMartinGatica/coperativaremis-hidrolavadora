@@ -1020,35 +1020,35 @@ work this size — noted as available, not recommended, for a fase this small.
 Synthesized from this review's findings. Each task derives from a specific finding
 above. Run with Claude Code; checkbox as you ship.
 
-- [ ] **T1 (P1, human: ~2h / CC: ~15min)** — payments — Add `searchByExternalReference` to `PaymentProvider` interface + `mercadoPagoProvider.ts` + `demoProvider.ts`
+- [x] **T1 (P1, human: ~2h / CC: ~15min)** — payments — Add `searchByExternalReference` to `PaymentProvider` interface + `mercadoPagoProvider.ts` + `demoProvider.ts`
   - Surfaced by: design doc Success Criteria + Eng Code Quality (multi-result selection rule)
   - Files: `apps/api/src/payments/provider.ts`, `mercadoPagoProvider.ts`, `demoProvider.ts`
   - Verify: unit tests for found/not-found/multiple-results/duplicate-anomaly cases
-- [ ] **T2 (P1, human: ~3h / CC: ~20min)** — payments — Extend `processApproval`'s terminal branch: exhaustive recoverability table + `source` field + sub-case A/B checks
+- [x] **T2 (P1, human: ~3h / CC: ~20min)** — payments — Extend `processApproval`'s terminal branch: exhaustive recoverability table + `source` field + sub-case A/B checks
   - Surfaced by: Eng Architecture (CRITICAL race fix)
   - Files: `apps/api/src/services/paymentService.ts`, new small module for the recoverability table
   - Verify: two-session-one-machine test (sub-case A + B), all 8 terminal states tested
-- [ ] **T3 (P1, human: ~1h / CC: ~10min)** — state-machine — Add `PAYMENT_EXPIRED -> AUTHORIZED` edge
+- [x] **T3 (P1, human: ~1h / CC: ~10min)** — state-machine — Add `PAYMENT_EXPIRED -> AUTHORIZED` edge
   - Surfaced by: design doc Approach B
   - Files: `packages/state-machine/src/index.ts`
   - Verify: transition table test, one assertion per terminal state
-- [ ] **T4 (P1, human: ~2h / CC: ~15min)** — sessions — Sweep: search-before-expire (outside tx), fault-isolated per session
+- [x] **T4 (P1, human: ~2h / CC: ~15min)** — sessions — Sweep: search-before-expire (outside tx), fault-isolated per session
   - Surfaced by: Eng Architecture (fault isolation) + Codex (tx/I-O separation)
   - Files: `apps/api/src/services/sessionService.ts`
   - Verify: MP-timeout-during-sweep test (batch continues for other machines)
-- [ ] **T5 (P1, human: ~3h / CC: ~20min)** — admin — New reconciliation routes: auto-retry button + manual-ID entry, default-admin-email guard
+- [x] **T5 (P1, human: ~3h / CC: ~20min)** — admin — New reconciliation routes: auto-retry button + manual-ID entry, default-admin-email guard
   - Surfaced by: design doc + CEO expansion items 1-2 + Eng Code Quality (admin gate)
   - Files: `apps/api/src/http/routes/adminRoutes.ts`, `apps/api/src/services/adminService.ts`
   - Verify: full route test matrix from Test Review diagram
-- [ ] **T6 (P2, human: ~30min / CC: ~5min)** — constants — Timeout 120s → 600s
+- [x] **T6 (P2, human: ~30min / CC: ~5min)** — constants — Timeout 120s → 600s
   - Surfaced by: CEO Decision #9
   - Files: `packages/shared/src/constants.ts`
   - Verify: existing timeout tests updated
-- [ ] **T7 (P2, human: ~1h / CC: ~10min)** — payments — Fix or remove `getPayment()` hardcoded stub
+- [x] **T7 (P2, human: ~1h / CC: ~10min)** — payments — Fix or remove `getPayment()` hardcoded stub
   - Surfaced by: original office-hours Success Criteria
   - Files: `apps/api/src/payments/mercadoPagoProvider.ts`
   - Verify: no callers reference the removed method, or new implementation tested
-- [ ] **T8 (P2, human: ~1h / CC: ~10min)** — docs — Update `TRANSITIONS` header comment + `db/schema.ts` unique-constraint comment if needed
+- [x] **T8 (P2, human: ~1h / CC: ~10min)** — docs — Update `TRANSITIONS` header comment + `db/schema.ts` unique-constraint comment if needed
   - Surfaced by: Eng Code Quality (diagram maintenance)
   - Files: `packages/state-machine/src/index.ts`
   - Verify: comment reflects the new edge
