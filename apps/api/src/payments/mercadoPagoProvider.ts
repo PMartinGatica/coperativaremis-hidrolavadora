@@ -1,12 +1,15 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { PaymentStatus } from '@hidro/shared';
-import type {
-  PaymentProvider,
-  ProviderPaymentCreateInput,
-  ProviderPaymentCreateResult,
-  ProviderPaymentQueryResult,
-  WebhookRequest,
-  WebhookValidation,
+import {
+  selectSearchMatch,
+  type PaymentProvider,
+  type ProviderPaymentCreateInput,
+  type ProviderPaymentCreateResult,
+  type ProviderPaymentLookupResult,
+  type ProviderPaymentSearchMatch,
+  type ProviderSearchResult,
+  type WebhookRequest,
+  type WebhookValidation,
 } from './provider.js';
 import type { AppConfig } from '../config.js';
 import { createLogger } from '../logger.js';
@@ -65,28 +68,12 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
     };
   }
 
-  async getPayment(externalPaymentId: string): Promise<ProviderPaymentQueryResult> {
-    const { Preference } = await this.sdk();
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const pref: any = await Preference.get({ id: externalPaymentId });
-      return { status: 'PENDING', rawStatus: String(pref.status ?? 'unknown'), amount: null };
-    } catch (err) {
-      log.warn('mp getPayment failed', { externalPaymentId, err: String(err) });
-      return { status: 'PENDING', rawStatus: 'lookup_failed', amount: null };
-    }
-  }
-
   /**
-   * Re-consulta el PAGO real por id (lo que reporta el webhook).
-   * Devuelve también external_reference (sessionId) para casar con nuestra sesión.
+   * Re-consulta el PAGO real por id (el que ve mesa de entrada en su propio dashboard/
+   * notificación de Mercado Pago, o el que reporta el webhook). Devuelve también
+   * external_reference (sessionId) para casar con nuestra sesión.
    */
-  async getPaymentById(paymentId: string): Promise<{
-    status: PaymentStatus;
-    rawStatus: string;
-    amount: number | null;
-    externalReference: string | null;
-  }> {
+  async getPaymentById(paymentId: string): Promise<ProviderPaymentLookupResult> {
     const { Payment } = await this.sdk();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const p: any = await Payment.get({ id: paymentId });
@@ -96,6 +83,36 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
       amount: typeof p.transaction_amount === 'number' ? Math.round(p.transaction_amount) : null,
       externalReference: p.external_reference ? String(p.external_reference) : null,
     };
+  }
+
+  /**
+   * Busca pagos por external_reference (nuestro sessionId). SPIKE: confirmar contra la
+   * documentación vigente de Mercado Pago el límite de resultados por página — con el
+   * volumen de esta cooperativa (pocos lavados/día) una sola página alcanza hoy; si el
+   * volumen crece, agregar paginación real antes de confiar en este método a ciegas.
+   */
+  async searchByExternalReference(externalReference: string, expectedAmount: number): Promise<ProviderSearchResult> {
+    const { Payment } = await this.sdk();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let response: any;
+    try {
+      response = await Payment.search({
+        options: { external_reference: externalReference, sort: 'date_created', criteria: 'desc', limit: 30 },
+      });
+    } catch (err) {
+      log.warn('mp searchByExternalReference failed', { externalReference, err: String(err) });
+      return { outcome: 'not_found' };
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const results: any[] = Array.isArray(response?.results) ? response.results : [];
+    const matches: ProviderPaymentSearchMatch[] = results.map((p) => ({
+      externalPaymentId: String(p.id ?? ''),
+      status: this.mapStatus(String(p.status ?? '')),
+      rawStatus: String(p.status ?? ''),
+      amount: typeof p.transaction_amount === 'number' ? Math.round(p.transaction_amount) : null,
+      currency: p.currency_id ? String(p.currency_id) : null,
+    }));
+    return selectSearchMatch(matches, expectedAmount);
   }
 
   private mapStatus(raw: string): PaymentStatus {

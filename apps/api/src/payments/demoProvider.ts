@@ -1,11 +1,14 @@
 import type { PaymentStatus } from '@hidro/shared';
-import type {
-  PaymentProvider,
-  ProviderPaymentCreateInput,
-  ProviderPaymentCreateResult,
-  ProviderPaymentQueryResult,
-  WebhookRequest,
-  WebhookValidation,
+import {
+  selectSearchMatch,
+  type PaymentProvider,
+  type ProviderPaymentCreateInput,
+  type ProviderPaymentCreateResult,
+  type ProviderPaymentLookupResult,
+  type ProviderPaymentSearchMatch,
+  type ProviderSearchResult,
+  type WebhookRequest,
+  type WebhookValidation,
 } from './provider.js';
 import { newDemoPaymentId } from '../ids.js';
 
@@ -44,10 +47,21 @@ export class DemoPaymentProvider implements PaymentProvider {
     return { externalPaymentId, status: this.defaultStatus, rawStatus: this.defaultStatus, initPoint: null };
   }
 
-  async getPayment(externalPaymentId: string): Promise<ProviderPaymentQueryResult> {
+  async getPaymentById(externalPaymentId: string): Promise<ProviderPaymentLookupResult> {
     const rec = this.records.get(externalPaymentId);
-    if (!rec) return { status: 'PENDING', rawStatus: 'not_found', amount: null };
-    return { status: rec.status, rawStatus: rec.rawStatus, amount: rec.amount };
+    if (!rec) return { status: 'PENDING', rawStatus: 'not_found', amount: null, externalReference: null };
+    return { status: rec.status, rawStatus: rec.rawStatus, amount: rec.amount, externalReference: rec.sessionId };
+  }
+
+  /** Mismo contrato que MercadoPagoPaymentProvider: busca por sessionId (external_reference). */
+  async searchByExternalReference(externalReference: string, expectedAmount: number): Promise<ProviderSearchResult> {
+    const matches: ProviderPaymentSearchMatch[] = [];
+    for (const rec of this.records.values()) {
+      if (rec.sessionId === externalReference) {
+        matches.push({ externalPaymentId: rec.externalPaymentId, status: rec.status, rawStatus: rec.rawStatus, amount: rec.amount, currency: null });
+      }
+    }
+    return selectSearchMatch(matches, expectedAmount);
   }
 
   /** El webhook de demo nunca es válido por diseño (se prueba con "webhook inválido"). */
