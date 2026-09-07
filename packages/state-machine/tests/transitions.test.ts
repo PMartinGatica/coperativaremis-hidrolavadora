@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { TERMINAL_SESSION_STATUSES } from '@hidro/shared';
 import {
   canTransition,
   TRANSITIONS,
@@ -53,6 +54,17 @@ describe('state machine: transiciones declaradas', () => {
   it('todos los estados tienen etiqueta', () => {
     for (const statuses of Object.values(TRANSITIONS)) {
       for (const s of statuses) expect(STATUS_LABELS[s]).toBeTruthy();
+    }
+  });
+
+  it('de los 8 estados terminales, SOLO PAYMENT_EXPIRED admite recuperación (Fase 1)', () => {
+    expect(TERMINAL_SESSION_STATUSES.length).toBe(8);
+    for (const status of TERMINAL_SESSION_STATUSES) {
+      if (status === 'PAYMENT_EXPIRED') {
+        expect(TRANSITIONS[status]).toEqual(['AUTHORIZED']);
+      } else {
+        expect(TRANSITIONS[status]).toEqual([]);
+      }
     }
   });
 });

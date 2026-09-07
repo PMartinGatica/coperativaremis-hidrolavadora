@@ -14,6 +14,11 @@ import {
  * Flujo feliz:
  *   IDLE -> PAYMENT_PENDING -> PAYMENT_APPROVED -> AUTHORIZED
  *        -> WAITING_FOR_BUTTON -> RUNNING -> FINISHED
+ *
+ * Único edge de RECUPERACIÓN (Fase 1, ADR-023/030): PAYMENT_EXPIRED -> AUTHORIZED.
+ * Reconciliación de un pago aprobado tardío (webhook perdido). Guardado por
+ * processApproval()'s tabla exhaustiva de recuperabilidad — de los 8 estados
+ * terminales, es el ÚNICO que admite esta transición; los otros 7 siguen en [].
  */
 export const TRANSITIONS: Readonly<Record<SessionStatus, readonly SessionStatus[]>> = {
   IDLE: ['PAYMENT_PENDING', 'MACHINE_OFFLINE'],
@@ -25,7 +30,8 @@ export const TRANSITIONS: Readonly<Record<SessionStatus, readonly SessionStatus[
   RUNNING: ['FINISHED', 'SESSION_INTERRUPTED', 'EMERGENCY_STOP', 'DEVICE_ERROR'],
   FINISHED: [],
   PAYMENT_FAILED: [],
-  PAYMENT_EXPIRED: [],
+  // Recuperable vía reconciliación de pagos (Fase 1): ver processApproval().
+  PAYMENT_EXPIRED: ['AUTHORIZED'],
   AUTHORIZATION_EXPIRED: [],
   MACHINE_OFFLINE: [],
   SESSION_INTERRUPTED: [],

@@ -17,10 +17,12 @@ export const DEFAULT_DURATION_SECONDS = 180;
 export const DEFAULT_AUTH_TTL_SECONDS = 300;
 /**
  * Tiempo máximo que una orden de pago sin confirmar ocupa la máquina.
- * 120 s: un checkout que nadie paga libera la máquina rápido (evita bloqueos
- * gratuitos en la vía pública). Configurable desde admin.
+ * 600 s (10 min, Fase 1 / ADR-032 — antes 120 s): escanear el QR, abrir la app de MP,
+ * loguearse y pagar con señal de una parada de remises supera 120 s en un pago LENTO
+ * normal, no solo en un caso raro de webhook perdido (ver ADR-023). 600 s balancea eso
+ * contra "un checkout que nadie paga libera la máquina rápido". Configurable desde admin.
  */
-export const DEFAULT_PAYMENT_PENDING_TIMEOUT_SECONDS = 120;
+export const DEFAULT_PAYMENT_PENDING_TIMEOUT_SECONDS = 600;
 export const DEFAULT_HEARTBEAT_INTERVAL_MS = 5000;
 export const DEVICE_AUTH_POLL_INTERVAL_MS = 2000;
 
