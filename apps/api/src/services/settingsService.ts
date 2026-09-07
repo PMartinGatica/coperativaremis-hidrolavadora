@@ -41,6 +41,11 @@ export async function getAuthTtlSeconds(db: Db, config: AppConfig): Promise<numb
   return typeof v === 'number' && v > 0 ? v : config.authTtlSeconds;
 }
 
+export async function getPaymentPendingTimeoutSeconds(db: Db, config: AppConfig): Promise<number> {
+  const v = await getSetting(db, SETTING_KEYS.paymentPendingTimeoutSeconds);
+  return typeof v === 'number' && v >= 60 ? v : config.paymentPendingTimeoutSeconds;
+}
+
 export async function getHeartbeatIntervalMs(db: Db, config: AppConfig): Promise<number> {
   const v = await getSetting(db, SETTING_KEYS.heartbeatIntervalMs);
   return typeof v === 'number' && v >= 1000 ? v : config.heartbeatIntervalMs;

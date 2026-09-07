@@ -32,7 +32,27 @@ import {
 } from '../repositories/repos.js';
 import { assertMachinePayable, categoryAndPriceOf } from './machineService.js';
 import { transitionSession } from './transition.js';
-import { getAuthTtlSeconds, getDailyWashLimit, getDemoTimeScale } from './settingsService.js';
+import { getAuthTtlSeconds, getDailyWashLimit, getDemoTimeScale, getPaymentPendingTimeoutSeconds } from './settingsService.js';
+import { processApproval } from './paymentService.js';
+
+/**
+ * Ventana máxima para la re-consulta al proveedor en el momento del timeout (ADR-023).
+ * Fault isolation (Eng review, hallazgo #3): un proveedor lento/caído nunca debe
+ * bloquear el vencimiento del resto de las máquinas en este mismo barrido.
+ */
+const SWEEP_SEARCH_TIMEOUT_MS = 5000;
+
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`timeout tras ${ms}ms`)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timer!);
+  }
+}
 
 export interface SessionDeps {
   db: Db;
@@ -187,6 +207,11 @@ const LABELS: Record<string, string> = {
   PAYMENT_APPROVED: 'Pago aprobado',
   PAYMENT_REJECTED: 'Pago rechazado',
   PAYMENT_EXPIRED: 'Pago vencido',
+  PAYMENT_AUTO_RECONCILED: 'Pago reconciliado automáticamente',
+  PAYMENT_MANUALLY_RECONCILED: 'Pago reconciliado por mesa de entrada',
+  PAYMENT_RECONCILE_REJECTED: 'Reconciliación rechazada',
+  PAYMENT_RECONCILE_AMBIGUOUS: 'Reconciliación ambigua (revisar cobro duplicado)',
+  PAYMENT_RECONCILE_DENIED: 'Reconciliación denegada (cuenta compartida)',
   WEBHOOK_RECEIVED: 'Webhook recibido',
   WEBHOOK_DUPLICATED: 'Webhook duplicado (ignorado)',
   WEBHOOK_INVALID: 'Webhook inválido (descartado)',
@@ -333,19 +358,64 @@ export async function interruptSession(
 export async function sweepExpired(deps: SessionDeps, now: Date): Promise<void> {
   const { db, config } = deps;
 
-  // 1) pagos pendientes vencidos
-  const cutoff = new Date(now.getTime() - config.paymentPendingTimeoutSeconds * 1000);
+  // 1) pagos pendientes vencidos: UNA última re-consulta al proveedor antes de vencer
+  //    (ADR-023) — un webhook perdido no puede escribir "no pagó" sobre un pago real.
+  //    Política de reintento: UNA sola vez por sesión, en el momento en que cruza el
+  //    timeout — no reintentos indefinidos (ver docs/designs/reconciliacion-pagos.md).
+  const timeoutSeconds = await getPaymentPendingTimeoutSeconds(db, config);
+  const cutoff = new Date(now.getTime() - timeoutSeconds * 1000);
   const staleSessions = await db
     .select()
     .from(sessionsTable)
     .where(and(eq(sessionsTable.status, 'PAYMENT_PENDING'), sql`${sessionsTable.createdAt} < ${cutoff}`));
   for (const s of staleSessions) {
+    // Búsqueda en el proveedor SIEMPRE fuera de cualquier transacción (mismo patrón que
+    // webhookRoutes.ts): nunca sostener I/O externo mientras se retiene un lock de fila.
+    const payment = await getPaymentBySession(db, s.id);
+    let recovered = false;
+    if (payment && payment.status === 'PENDING') {
+      try {
+        const search = await withTimeout(deps.provider.searchByExternalReference(s.id, payment.amount), SWEEP_SEARCH_TIMEOUT_MS);
+        if (search.outcome === 'ambiguous') {
+          await insertAudit(db, {
+            actor: 'system',
+            action: 'PAYMENT_RECONCILE_AMBIGUOUS',
+            entity: 'session',
+            entityId: s.id,
+            metadata: { sessionId: s.id, machineId: s.machineId, candidates: search.matches.length },
+          });
+        }
+        if (search.outcome === 'found') {
+          // processApproval decide todo lo demás (aprobado/máquina offline/monto
+          // incorrecto) — cualquiera de esos resultados ya sacó a la sesión de
+          // PAYMENT_PENDING, así que este ciclo del barrido no debe vencerla también.
+          await processApproval(deps, {
+            externalPaymentId: payment.externalPaymentId,
+            providerStatus: search.match.status,
+            providerRawStatus: search.match.rawStatus,
+            providerAmount: search.match.amount,
+            source: 'sweep',
+          });
+          recovered = true;
+        }
+      } catch (err) {
+        // Fault isolation: un proveedor lento/caído no bloquea el vencimiento de las
+        // demás máquinas de este mismo barrido — cae al comportamiento normal de abajo.
+        deps.logger.warn('sweep: searchByExternalReference falló, se vence normalmente', {
+          sessionId: s.id,
+          machineId: s.machineId,
+          err: String(err),
+        });
+      }
+    }
+    if (recovered) continue;
+
     await db.transaction(async (tx) => {
       const row = await transitionSession(tx, s.id, 'PAYMENT_PENDING', 'PAYMENT_EXPIRED');
       if (!row) return;
-      const payment = await getPaymentBySession(tx, s.id);
-      if (payment && payment.status === 'PENDING') {
-        await setPaymentStatus(tx, payment.id, 'EXPIRED', 'expired');
+      const p = await getPaymentBySession(tx, s.id);
+      if (p && p.status === 'PENDING') {
+        await setPaymentStatus(tx, p.id, 'EXPIRED', 'expired');
       }
       await insertAudit(tx, { actor: 'system', action: 'PAYMENT_EXPIRED', entity: 'session', entityId: s.id, metadata: { sessionId: s.id, machineId: s.machineId } });
     });
