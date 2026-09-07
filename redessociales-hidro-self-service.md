@@ -63,32 +63,60 @@ fase es un capítulo del storyline. No se reescriben las fases anteriores; se ac
 
 > Al cerrar la FASE-N, agregá un bloque acá. No borres los anteriores: el storyline es la suma.
 
-### FASE-{N} — {NOMBRE_FASE}  ·  cerrada {FECHA}
+### FASE-1 — Reconciliación de pagos  ·  cerrada 2026-09-07
 
-**Qué se mostró en esta fase (1 línea):** {qué nueva capacidad de la herramienta aparece acá}
+**Qué se mostró en esta fase (1 línea):** si el cliente pagó pero el sistema se distrajo un
+segundo, la máquina igual se entera y se prende — nadie pierde esa plata.
 
 **Guión largo — capítulo de esta fase (para el video de 10–20 min):**
-- **Dónde quedamos / qué problema seguía abierto:** {arranca enganchando con la fase anterior}
+- **Dónde quedamos / qué problema seguía abierto:** la máquina cobra sola desde el día uno,
+  pero había un hueco silencioso: si el cliente tardaba un poco en confirmar el pago desde el
+  celular (señal mala, cola en Mercado Pago, lo que sea), el sistema se cansaba de esperar y
+  daba por perdido un pago que en realidad SÍ había entrado. El cliente había pagado. El
+  sistema decía que no. Y nadie se enteraba hasta que el cliente reclamaba con el
+  comprobante en la mano.
 - **Qué se construyó en esta fase, contado como pasos en la herramienta:**
-  1. {paso visible 1 — qué se ve / qué se hace / qué resuelve}
-  2. {paso visible 2}
-  3. {paso visible 3}
-- **El momento "ajá":** {el punto donde se ve que esto le sirve al espectador}
-- **Cómo queda la herramienta al final de la fase:** {estado mostrable, sin tecnicismos}
-- **Puente a la próxima fase:** {qué falta todavía — deja la historia abierta}
+  1. Antes de darse por vencido, el sistema ahora vuelve a preguntarle a Mercado Pago "¿este
+     pago entró o no?" — una última chequeada, justo antes de cerrar la puerta.
+  2. Si Mercado Pago dice que sí entró, la máquina se habilita SOLA, sin que nadie toque nada.
+     El cliente ni se entera de que hubo un sobresalto.
+  3. Si el sistema ya cerró la puerta antes de darse cuenta, mesa de entrada tiene dos botones
+     nuevos: "revisar de nuevo" (un click, sin escribir nada) o cargar el número real del
+     comprobante de Mercado Pago a mano — nunca un tilde a ciegas, siempre contra el pago real.
+  4. Blindaje extra: si mientras tanto otro cliente ya está usando esa misma máquina, el
+     sistema NUNCA habilita dos lavados a la vez, pase lo que pase con el pago viejo.
+- **El momento "ajá":** el cliente paga, el celular tarda en confirmar, pasa un rato... y la
+  luz verde igual se prende sola. Nadie corrió, nadie llamó a nadie, nadie perdió la plata.
+- **Cómo queda la herramienta al final de la fase:** la máquina sigue cobrando sola como
+  siempre, pero ahora un pago lento o una conexión mala ya no significa "plata perdida" — se
+  recupera solo, o mesa de entrada lo resuelve con dos clicks si hace falta.
+- **Puente a la próxima fase:** todavía falta el botón en la pantalla de mesa de entrada (hoy
+  se prueba por detrás, no tiene cara todavía) y definir qué pasa cuando de verdad hay que
+  devolver una plata — esa es la conversación que sigue con el dueño.
 
 **Short / Reel (30–45s, generado con `viral-youtube-shorts`):**
-- **Hook (primeros 3s):** {línea que para el scroll}
-- **Desarrollo:** {la transformación en 2–3 beats}
-- **Payoff:** {el resultado visible}
-- **Loop / cierre:** {beat final que invita a re-ver o al video largo}
-- **CTA:** {"video completo en el canal" / "escribime si querés una igual"}
+- **Hook (primeros 3s):** "El cliente pagó. El sistema dijo que no." (texto en pantalla sobre
+  el celular mostrando el comprobante aprobado de Mercado Pago)
+- **Desarrollo:** se ve la pantalla de la máquina diciendo "pago vencido" con el comprobante
+  de Mercado Pago al lado mostrando "aprobado" — el contraste es el gancho. Corte: "así que le
+  enseñamos al sistema a volver a preguntar antes de rendirse."
+- **Payoff:** la luz verde se prende sola en cámara, sin que nadie toque el celular ni la
+  máquina de nuevo.
+- **Loop / cierre:** vuelve al plano inicial del comprobante "aprobado" — mismo plano, ahora
+  con la luz verde ya prendida al fondo, invitando a mirar de nuevo el antes/después.
+- **CTA:** "video completo en el canal" + "si tu máquina cobra sola y a veces se traba con
+  pagos, escribime."
 
 **Caption de feed (Instagram/otros):**
-- **Gancho de apertura:** {1–2 líneas}
-- **Cuerpo:** {qué resuelve, contado simple}
-- **Cierre + llamado a contacto:** {sin presión}
-- **Hashtags sugeridos:** {3–6 acotados al nicho}
+- **Gancho de apertura:** Pagó, y el sistema le dijo que no. Pasa más seguido de lo que pensás.
+- **Cuerpo:** cuando una máquina cobra sola por QR, un pago que tarda un segundo de más puede
+  hacer que el sistema se dé por vencido y cierre la puerta — aunque la plata ya haya entrado.
+  Le enseñamos a volver a preguntar antes de rendirse, y si igual se le escapa, quien atiende
+  el local lo resuelve con dos clicks, nunca a ciegas.
+- **Cierre + llamado a contacto:** si tenés una máquina que cobra por uso y no querés que un
+  pago lento se traduzca en plata perdida, escribime y vemos cómo se resuelve.
+- **Hashtags sugeridos:** #automatizacion #pagosdigitales #mercadopago #cooperativa #ushuaia
+  #sinfichas
 
 ---
 

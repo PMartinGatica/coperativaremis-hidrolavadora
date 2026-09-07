@@ -445,3 +445,37 @@
   bloqueado en el dueño" invertía la relación esfuerzo/impacto: es el fix más barato y
   de mayor apalancamiento de toda la fase, y es un parámetro revisable, no una política
   de negocio inventada. El dueño puede ajustarlo después sin que eso bloquee el Build.
+
+- **2026-09-07 — ADR-033: Fase 1 (reconciliación de pagos) construida y cerrada — T1-T8 +
+  2 bugs reales encontrados escribiendo los tests, no en el diseño.** Build directo de las
+  8 tareas de `docs/designs/reconciliacion-pagos.md` (ya `/office-hours` + `/autoplan`
+  CLEARED). Dos hallazgos que el diseño no había cubierto:
+  (1) **`isUniqueViolation` nunca detectaba nada, en ningún driver.** drizzle-orm envuelve
+  todo error del driver en su propio `DrizzleQueryError` (mensaje "Failed query: ...") y
+  mueve el error ORIGINAL (con `.code`/`.constraint` estructurados, tanto en `pg` como en
+  PGlite) a `.cause`. El chequeo solo miraba el error atrapado, nunca `.cause` — el
+  sub-caso A (`machine_occupied`) de ADR-030 nunca se activaba: la violación del índice
+  único salía como 500 crudo en vez de una respuesta controlada. Encontrado al escribir el
+  test de sub-caso A (`reconciliation.test.ts`), invisible leyendo el código solo.
+  (2) **El chequeo de recencia (sub-caso B) hacía inalcanzable al sub-caso A.**
+  `existsNewerSessionForMachine` no filtraba por estado: como CUALQUIER sesión más nueva
+  en la máquina calza "creada después", el chequeo de recencia disparaba siempre primero
+  para cualquier sesión más nueva — activa o terminal — dejando el catch de la violación
+  del índice único sin caso posible de uso, y devolviendo `machine_used_since` (mensaje
+  "ya se usó y se liberó") cuando la máquina en realidad está ocupada AHORA. Fix: el
+  chequeo de recencia se restringe a `TERMINAL_SESSION_STATUSES` — una sesión más nueva
+  que sigue activa la resuelve el índice único (su propósito original), una terminal la
+  resuelve la recencia. Motivo por el que ninguno de los dos apareció en `/autoplan`: el
+  diseño describió la lógica correctamente en prosa y el diagrama ASCII; el error estaba
+  en la implementación de `existsNewerSessionForMachine`, no en el diseño.
+  **Tercer hallazgo, no un bug de esta fase:** `paymentPendingTimeoutSeconds` era
+  decorativo en el admin desde antes de esta fase — `sweepExpired` nunca lo leía del
+  setting dinámico, solo del `.env` estático, a diferencia de sus 3 hermanos
+  (`authTtlSeconds`, `dailyWashLimit`, `heartbeatIntervalMs`). Encontrado escribiendo
+  `qa/FASE-1-manual.md` (necesitaba una forma de acortar el timeout para probar a mano) y
+  arreglado en el mismo cierre por ser barato y estar directamente en el camino crítico
+  del mecanismo que esta fase agrega. 91 tests verdes (84 en `@hidro/api` + 7 en
+  `@hidro/state-machine`; 48 y 6 respectivamente eran preexistentes — 37 tests nuevos, 0
+  regresiones), `/review` + `/cso --code --diff` + `/qa` (sustituido por guía manual,
+  fase 100% backend sin UI todavía) limpios. Pendiente explícito: `qa/FASE-1-manual.md`
+  necesita el veredicto de Pablo corriéndola a mano — puerta (b) abierta hasta entonces.
