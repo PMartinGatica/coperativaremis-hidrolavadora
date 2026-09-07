@@ -5,7 +5,7 @@ import type {
   PaymentStatus,
   SessionStatus,
 } from '@hidro/shared';
-import { ACTIVE_SESSION_STATUSES, WASH_COUNTING_STATUSES } from '@hidro/shared';
+import { ACTIVE_SESSION_STATUSES, TERMINAL_SESSION_STATUSES, WASH_COUNTING_STATUSES } from '@hidro/shared';
 import type { Db } from '../db/client.js';
 import {
   auditLogs,
@@ -135,6 +135,40 @@ export async function getSession(db: Db, id: string) {
 export async function getSessionForUpdate(db: Db, id: string) {
   const rows = await db.select().from(sessions).where(eq(sessions.id, id)).for('update').limit(1);
   return rows[0] ?? null;
+}
+
+/**
+ * Sub-caso B de la recuperación de PAYMENT_EXPIRED (Fase 1, ADR-030): ¿ya se creó otra
+ * sesión en esta máquina desde que la que estamos por recuperar fue creada, Y ESA OTRA
+ * SESIÓN YA TERMINÓ (liberó la máquina)? Restringido a estados TERMINALES a propósito
+ * (docs/designs/reconciliacion-pagos.md, diagrama de arquitectura): una sesión más nueva
+ * que sigue ACTIVA es sub-caso A (la máquina está ocupada AHORA, no "ya se usó y liberó")
+ * y ese caso lo resuelve el índice único `uq_sessions_active_machine` al intentar la
+ * escritura — mezclar ambas acá haría inalcanzable a sub-caso A, porque toda sesión más
+ * nueva por definición se creó DESPUÉS de la que se está recuperando. Chequeo POSITIVO
+ * de existencia (no de "último"), a propósito: con `createdAt >= A.createdAt` (no `>`)
+ * evita depender de un tie-break seguro entre timestamps iguales. Usa
+ * idx_sessions_machine_created — sin índice nuevo.
+ */
+export async function existsNewerSessionForMachine(
+  db: Db,
+  machineId: string,
+  excludeSessionId: string,
+  sinceCreatedAt: Date,
+): Promise<boolean> {
+  const rows = await db
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(
+      and(
+        eq(sessions.machineId, machineId),
+        gte(sessions.createdAt, sinceCreatedAt),
+        sql`${sessions.id} != ${excludeSessionId}`,
+        inArray(sessions.status, TERMINAL_SESSION_STATUSES),
+      ),
+    )
+    .limit(1);
+  return rows.length > 0;
 }
 
 export async function getActiveSessionForMachine(db: Db, machineId: string) {

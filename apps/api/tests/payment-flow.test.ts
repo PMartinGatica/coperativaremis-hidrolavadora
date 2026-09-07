@@ -76,6 +76,7 @@ describe('flujo de pago DEMO (mismo dominio que Mercado Pago)', () => {
       providerStatus: 'APPROVED',
       providerRawStatus: 'approved',
       providerAmount: 999999, // monto manipulado
+      source: 'webhook',
     });
     expect(result.result).toBe('amount_mismatch');
     expect(await sessionStatus(t, sessionId)).toBe('PAYMENT_FAILED');

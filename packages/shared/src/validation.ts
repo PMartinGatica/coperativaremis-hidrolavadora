@@ -102,6 +102,11 @@ export const EmergencyStopSchema = z.object({
   confirmation: z.literal('DETENER'),
 });
 
+export const PaymentReconcileManualSchema = z.object({
+  /** ID real de pago de Mercado Pago (el que ve mesa de entrada en su propio dashboard). */
+  paymentId: z.string().min(1, 'Ingresá el ID de pago de Mercado Pago.').max(64),
+});
+
 export const SettingsPatchSchema = z.object({
   demoSpeedFactor: z.number().min(1).max(600).optional(),
   authTtlSeconds: z.number().int().min(30).max(3600).optional(),

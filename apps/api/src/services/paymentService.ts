@@ -6,10 +6,13 @@ import type { PaymentProvider } from '../payments/provider.js';
 import { DemoPaymentProvider } from '../payments/demoProvider.js';
 import { uuid } from '../ids.js';
 import {
+  existsNewerSessionForMachine,
   getAuthorizationByPayment,
   getMachineForUpdate,
   getPaymentByExternalId,
   getPaymentByExternalIdForUpdate,
+  getPaymentBySession,
+  getSession,
   getSessionForUpdate,
   insertAudit,
   insertAuthorization,
@@ -18,6 +21,7 @@ import {
 } from '../repositories/repos.js';
 import { transitionSession } from './transition.js';
 import { getAuthTtlSeconds } from './settingsService.js';
+import { isRecoverableTerminalStatus } from './paymentRecovery.js';
 
 export interface PaymentDeps {
   db: Db;
@@ -34,19 +38,66 @@ export type ApprovalResultType =
   | 'amount_mismatch'
   | 'session_terminal'
   | 'offline'
-  | 'pending';
+  | 'pending'
+  /** Sub-caso A de la recuperación (ADR-030): otra sesión sigue ACTIVA en la máquina. */
+  | 'machine_occupied'
+  /** Sub-caso B de la recuperación (ADR-030): la máquina ya se usó para otro cliente desde entonces. */
+  | 'machine_used_since';
+
+/**
+ * Quién dispara esta aprobación — explícito, nunca inferido dentro de la función
+ * (Eng review, hallazgo #9/#12 de Codex): con hasta 3 caminos de entrada distintos
+ * (webhook, barrido automático, mesa de entrada), la auditoría necesita saber cuál sin
+ * adivinar por contexto.
+ *   webhook        -> notificación de Mercado Pago (camino feliz, sin cambios)
+ *   sweep          -> el barrido re-consulta UNA vez al cruzar el timeout (ADR-023)
+ *   admin_recheck  -> mesa de entrada aprieta "reintentar automáticamente" (sin ID)
+ *   admin_manual   -> mesa de entrada tipea el ID real de pago de Mercado Pago
+ */
+export type ApprovalSource = 'webhook' | 'sweep' | 'admin_recheck' | 'admin_manual';
 
 export interface ApprovalInput {
   externalPaymentId: string;
   providerStatus: PaymentStatus;
   providerRawStatus: string;
   providerAmount: number | null;
+  source: ApprovalSource;
+  /** Solo para source='admin_recheck'/'admin_manual': quién ejecuta la acción (auditoría). */
+  actorEmail?: string;
 }
 
 export interface ApprovalResult {
   result: ApprovalResultType;
   sessionId?: string;
   authorizationId?: string;
+}
+
+/** ¿Es este el intento de reconciliación de un pago aprobado tardío (ADR-023/030)? */
+function reconciliationAuditAction(source: ApprovalSource): 'PAYMENT_AUTO_RECONCILED' | 'PAYMENT_MANUALLY_RECONCILED' {
+  return source === 'admin_manual' ? 'PAYMENT_MANUALLY_RECONCILED' : 'PAYMENT_AUTO_RECONCILED';
+}
+
+/**
+ * Detecta la violación del índice único parcial `uq_sessions_active_machine` (sub-caso A
+ * de la recuperación, ADR-030) sin depender de un pre-chequeo con su propia carrera: el
+ * índice de Postgres serializa esto solo para cualquier escritor, con o sin lock de fila.
+ * drizzle-orm envuelve el error del driver en un `DrizzleQueryError` propio y mueve el
+ * error original (con `.code`/`.constraint` estructurados, tanto en `pg` como en PGlite)
+ * a `.cause` — el mensaje del wrapper NUNCA menciona "duplicate key" ni el constraint, así
+ * que hay que revisar `.cause` explícitamente o el chequeo nunca matchea en ningún driver.
+ */
+function isUniqueViolation(err: unknown, constraintName: string): boolean {
+  for (const candidate of [err, err instanceof Error ? err.cause : undefined]) {
+    if (!(candidate instanceof Error)) continue;
+    const withCode = candidate as Error & { code?: string; constraint?: string };
+    if (withCode.code === '23505') {
+      return !withCode.constraint || withCode.constraint === constraintName;
+    }
+    if (/duplicate key|unique constraint/i.test(candidate.message) && candidate.message.includes(constraintName)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -90,6 +141,12 @@ export async function processApproval(deps: PaymentDeps, input: ApprovalInput): 
 
   const existingAuth = await getAuthorizationByPayment(tx, payment.id);
 
+  // Intento de RECONCILIACIÓN de un pago vencido (ADR-023/030): el session.status ya
+  // nos dice si esto es un intento válido de recuperación, sin inferir nada del `source`.
+  // Sin este escape, el guard de abajo trataría CUALQUIER pago 'EXPIRED' como un caso
+  // ya resuelto para siempre — que es exactamente el bug que esta fase corrige.
+  const isReconciliationAttempt = payment.status === 'EXPIRED' && isRecoverableTerminalStatus(session.status);
+
   // ---- Ya resuelto antes: idempotencia pura (webhook duplicado) ----
   if (payment.status === 'APPROVED' && existingAuth && existingAuth.status !== 'REVOKED') {
     await insertAudit(tx, {
@@ -101,7 +158,7 @@ export async function processApproval(deps: PaymentDeps, input: ApprovalInput): 
     });
     return { result: 'duplicated', sessionId: session.id, authorizationId: existingAuth.id };
   }
-  if (['REJECTED', 'EXPIRED', 'REFUNDED'].includes(payment.status)) {
+  if (!isReconciliationAttempt && ['REJECTED', 'EXPIRED', 'REFUNDED'].includes(payment.status)) {
     await insertAudit(tx, {
       actor: 'system',
       action: 'WEBHOOK_DUPLICATED',
@@ -221,10 +278,12 @@ export async function processApproval(deps: PaymentDeps, input: ApprovalInput): 
     await transitionSession(tx, session.id, 'PAYMENT_APPROVED', 'AUTHORIZED', { authorizationId: auth.id });
     await insertAudit(tx, {
       actor: 'system',
-      action: 'PAYMENT_APPROVED',
+      // El barrido encontrando el pago EN el momento del timeout ya es la señal de "pagó
+      // pero casi no se lava" (ADR-023) — se etiqueta distinto del webhook normal.
+      action: input.source === 'sweep' ? 'PAYMENT_AUTO_RECONCILED' : 'PAYMENT_APPROVED',
       entity: 'payment',
       entityId: payment.id,
-      metadata: { sessionId: session.id, amount: payment.amount },
+      metadata: { sessionId: session.id, amount: payment.amount, source: input.source },
     });
     await insertAudit(tx, {
       actor: 'system',
@@ -268,15 +327,89 @@ export async function processApproval(deps: PaymentDeps, input: ApprovalInput): 
     return { result: 'duplicated', sessionId: session.id, authorizationId: existingAuth?.id };
   }
 
-  // ---- Sesión en estado terminal (rechazada/vencida/oficina/etc.): pago tardío ----
-  await insertAudit(tx, {
-    actor: 'system',
-    action: 'PAYMENT_APPROVED',
-    entity: 'payment',
-    entityId: payment.id,
-    metadata: { sessionId: session.id, sessionStatus: session.status, note: 'PENDING CLIENT DECISION: pago aprobado sobre sesión no utilizable (reembolso manual)' },
-  });
-  return { result: 'session_terminal', sessionId: session.id };
+  // ---- Sesión en estado terminal NO recuperable: pago tardío, sin acción posible ----
+  if (!isRecoverableTerminalStatus(session.status)) {
+    await insertAudit(tx, {
+      actor: 'system',
+      action: 'PAYMENT_APPROVED',
+      entity: 'payment',
+      entityId: payment.id,
+      metadata: { sessionId: session.id, sessionStatus: session.status, note: 'PENDING CLIENT DECISION: pago aprobado sobre sesión no utilizable (reembolso manual)' },
+    });
+    return { result: 'session_terminal', sessionId: session.id };
+  }
+
+  // ---- Recuperación de PAYMENT_EXPIRED: pago aprobado tardío (ADR-023/030) ----
+  // Deliberadamente NO se chequea machineUsable acá (a diferencia del camino feliz de
+  // arriba): esta rama solo corre para una máquina que HOY no está `machine_occupied`
+  // (sub-caso A, más abajo). Si además está OFFLINE, la autorización queda inerte y el
+  // barrido de autorizaciones vencidas (sección 2 de sweepExpired) la cierra sola con la
+  // transición YA legal AUTHORIZED -> AUTHORIZATION_EXPIRED — no hace falta un segundo
+  // edge nuevo (PAYMENT_EXPIRED -> MACHINE_OFFLINE) para un caso sin impacto de seguridad.
+  const actor = input.actorEmail ?? 'system';
+
+  // Sub-caso B: otra sesión de esta máquina ya se creó desde que ÉSTA se creó (aunque ya
+  // haya terminado). El índice único no lo detecta (excluye estados terminales a
+  // propósito) — por eso hace falta este chequeo positivo, dentro de la MISMA
+  // transacción que la escritura, inmediatamente antes de intentarla.
+  const usedSince = await existsNewerSessionForMachine(tx, payment.machineId, session.id, session.createdAt);
+  if (usedSince) {
+    await insertAudit(tx, {
+      actor,
+      action: 'PAYMENT_RECONCILE_REJECTED',
+      entity: 'session',
+      entityId: session.id,
+      metadata: { sessionId: session.id, machineId: payment.machineId, reason: 'machine_used_since', source: input.source },
+    });
+    return { result: 'machine_used_since', sessionId: session.id };
+  }
+
+  // Sub-caso A: otra sesión SIGUE ACTIVA en esta máquina ahora mismo. No hace falta
+  // pre-chequearlo: el índice único parcial `uq_sessions_active_machine` ya lo serializa
+  // para cualquier escritor — alcanza con capturar la violación en vez de dejarla salir
+  // como un 500 crudo. El SAVEPOINT (tx.transaction anidado) permite seguir usando `tx`
+  // para auditar el rechazo después de que Postgres aborte este intento puntual.
+  try {
+    const auth = await tx.transaction(async (tx2) => {
+      const inserted = await insertAuthorization(tx2, {
+        id: uuid(),
+        sessionId: session.id,
+        machineId: payment.machineId,
+        paymentId: payment.id,
+        status: 'AUTHORIZED',
+        expiresAt: new Date(Date.now() + ttl * 1000),
+      });
+      await transitionSession(tx2, session.id, session.status, 'AUTHORIZED', { authorizationId: inserted.id });
+      return inserted;
+    });
+    await insertAudit(tx, {
+      actor,
+      action: reconciliationAuditAction(input.source),
+      entity: 'payment',
+      entityId: payment.id,
+      metadata: { sessionId: session.id, machineId: payment.machineId, authorizationId: auth.id, source: input.source, previousStatus: session.status },
+    });
+    await insertAudit(tx, {
+      actor: 'system',
+      action: 'AUTH_CREATED',
+      entity: 'authorization',
+      entityId: auth.id,
+      metadata: { sessionId: session.id, machineId: payment.machineId, ttlSeconds: ttl, note: 'reconciliation_recovery' },
+    });
+    return { result: 'approved', sessionId: session.id, authorizationId: auth.id };
+  } catch (err) {
+    if (isUniqueViolation(err, 'uq_sessions_active_machine')) {
+      await insertAudit(tx, {
+        actor,
+        action: 'PAYMENT_RECONCILE_REJECTED',
+        entity: 'session',
+        entityId: session.id,
+        metadata: { sessionId: session.id, machineId: payment.machineId, reason: 'machine_occupied', source: input.source },
+      });
+      return { result: 'machine_occupied', sessionId: session.id };
+    }
+    throw err;
+  }
   });
 }
 
@@ -286,6 +419,7 @@ export async function processRejection(deps: PaymentDeps, externalPaymentId: str
     providerStatus: 'REJECTED',
     providerRawStatus: rawStatus,
     providerAmount: null,
+    source: 'webhook',
   });
 }
 
@@ -318,7 +452,7 @@ export async function simulateDemoPayment(
 
   if (action === 'reject') {
     const r = demo.reject(externalPaymentId);
-    return processApproval(deps, { externalPaymentId, providerStatus: r.status as PaymentStatus, providerRawStatus: r.rawStatus, providerAmount: r.amount });
+    return processApproval(deps, { externalPaymentId, providerStatus: r.status as PaymentStatus, providerRawStatus: r.rawStatus, providerAmount: r.amount, source: 'webhook' });
   }
 
   // approve / duplicate_webhook
@@ -328,6 +462,7 @@ export async function simulateDemoPayment(
     providerStatus: r.status as PaymentStatus,
     providerRawStatus: r.rawStatus,
     providerAmount: r.amount,
+    source: 'webhook',
   });
   if (action === 'duplicate_webhook') {
     const second = await processApproval(deps, {
@@ -335,6 +470,7 @@ export async function simulateDemoPayment(
       providerStatus: r.status as PaymentStatus,
       providerRawStatus: r.rawStatus,
       providerAmount: r.amount,
+      source: 'webhook',
     });
     return { ...second, paymentStatus: r.status };
   }
@@ -347,7 +483,7 @@ export async function getPaymentPublicInfo(deps: PaymentDeps, externalPaymentId:
   }
   const payment = await getPaymentByExternalId(deps.db, externalPaymentId);
   if (!payment) throw new AppError('PAYMENT_NOT_FOUND', 'Pago no encontrado.');
-  const { getMachine, getSession } = await import('../repositories/repos.js');
+  const { getMachine } = await import('../repositories/repos.js');
   const machine = await getMachine(deps.db, payment.machineId);
   const session = await getSession(deps.db, payment.sessionId);
   return {
@@ -389,4 +525,134 @@ export async function refundPayment(deps: PaymentDeps, externalPaymentId: string
     });
   }
   return res;
+}
+
+// ==================================================================================
+// RECONCILIACIÓN DE MESA DE ENTRADA (Fase 1) — dos caminos, mismo funnel de siempre
+// (processApproval). Nunca se autoriza sin una consulta real y positiva al proveedor:
+// "reintentar automáticamente" reusa searchByExternalReference (sin ID, sin tipeo);
+// "aprobación manual" exige el ID real de pago (getPaymentById), nunca un checkbox.
+// ==================================================================================
+
+export type ReconcileResultType =
+  | ApprovalResultType
+  | 'not_found'
+  | 'ambiguous'
+  | 'not_recoverable'
+  | 'session_id_mismatch'
+  | 'default_admin_forbidden';
+
+export interface ReconcileResult {
+  result: ReconcileResultType;
+  sessionId: string;
+  authorizationId?: string;
+}
+
+/**
+ * Cuenta compartida por defecto = auditoría decorativa (Eng review, hallazgo #4): mesa
+ * de entrada necesita cuentas INDIVIDUALES antes de reconciliar en producción. Chequeo
+ * barato de configuración, no identidad real — la versión robusta (permiso `reconcile`
+ * dedicado) queda en TODOS.md.
+ */
+function isSeededDefaultAdmin(config: AppConfig, email: string): boolean {
+  return email.trim().toLowerCase() === config.adminEmail.trim().toLowerCase();
+}
+
+async function denyDefaultAdmin(deps: PaymentDeps, sessionId: string, actorEmail: string): Promise<ReconcileResult | null> {
+  if (!isSeededDefaultAdmin(deps.config, actorEmail)) return null;
+  await insertAudit(deps.db, {
+    actor: actorEmail,
+    action: 'PAYMENT_RECONCILE_DENIED',
+    entity: 'session',
+    entityId: sessionId,
+    metadata: { sessionId, reason: 'default_admin_account' },
+  });
+  return { result: 'default_admin_forbidden', sessionId };
+}
+
+/** Preámbulo común a ambos caminos de reconciliación: cuenta permitida + sesión recuperable + pago registrado. */
+async function loadRecoverableSessionAndPayment(
+  deps: PaymentDeps,
+  sessionId: string,
+  actorEmail: string,
+): Promise<ReconcileResult | { payment: NonNullable<Awaited<ReturnType<typeof getPaymentBySession>>> }> {
+  const denied = await denyDefaultAdmin(deps, sessionId, actorEmail);
+  if (denied) return denied;
+
+  const session = await getSession(deps.db, sessionId);
+  if (!session) throw new AppError('SESSION_NOT_FOUND', `Sesión no encontrada: ${sessionId}`);
+  if (!isRecoverableTerminalStatus(session.status)) {
+    return { result: 'not_recoverable', sessionId };
+  }
+  const payment = await getPaymentBySession(deps.db, sessionId);
+  if (!payment) throw new AppError('PAYMENT_NOT_FOUND', `Sin pago registrado para la sesión ${sessionId}`);
+  return { payment };
+}
+
+/** Paso 1: "reintentar automáticamente" — sin ID, sin tipeo, mesa de entrada solo aprieta un botón. */
+export async function reconcileSessionAutomatic(deps: PaymentDeps, sessionId: string, actorEmail: string): Promise<ReconcileResult> {
+  const loaded = await loadRecoverableSessionAndPayment(deps, sessionId, actorEmail);
+  if ('result' in loaded) return loaded;
+  const { payment } = loaded;
+
+  const search = await deps.provider.searchByExternalReference(sessionId, payment.amount);
+  if (search.outcome === 'not_found') {
+    return { result: 'not_found', sessionId };
+  }
+  if (search.outcome === 'ambiguous') {
+    await insertAudit(deps.db, {
+      actor: actorEmail,
+      action: 'PAYMENT_RECONCILE_AMBIGUOUS',
+      entity: 'payment',
+      entityId: payment.id,
+      metadata: { sessionId, candidates: search.matches.length },
+    });
+    return { result: 'ambiguous', sessionId };
+  }
+
+  const approval = await processApproval(deps, {
+    externalPaymentId: payment.externalPaymentId,
+    providerStatus: search.match.status,
+    providerRawStatus: search.match.rawStatus,
+    providerAmount: search.match.amount,
+    source: 'admin_recheck',
+    actorEmail,
+  });
+  return { result: approval.result, sessionId: approval.sessionId ?? sessionId, authorizationId: approval.authorizationId };
+}
+
+/** Paso 2: aprobación manual con el ID real de pago de Mercado Pago (nunca un checkbox ciego). */
+export async function reconcileSessionManual(
+  deps: PaymentDeps,
+  sessionId: string,
+  providerPaymentId: string,
+  actorEmail: string,
+): Promise<ReconcileResult> {
+  const loaded = await loadRecoverableSessionAndPayment(deps, sessionId, actorEmail);
+  if ('result' in loaded) return loaded;
+  const { payment } = loaded;
+
+  const remote = await deps.provider.getPaymentById(providerPaymentId);
+  if (remote.externalReference !== sessionId) {
+    await insertAudit(deps.db, {
+      actor: actorEmail,
+      action: 'PAYMENT_RECONCILE_REJECTED',
+      entity: 'payment',
+      entityId: payment.id,
+      metadata: { sessionId, providerPaymentId, reason: 'session_id_mismatch', foundExternalReference: remote.externalReference },
+    });
+    return { result: 'session_id_mismatch', sessionId };
+  }
+
+  // A partir de acá reusa EXACTAMENTE el mismo funnel que el webhook (processApproval):
+  // rechazado/pendiente/amount_mismatch quedan resueltos por sus ramas ya existentes.
+  const approval = await processApproval(deps, {
+    externalPaymentId: payment.externalPaymentId,
+    providerStatus: remote.status,
+    providerRawStatus: remote.rawStatus,
+    providerAmount: remote.amount,
+    source: 'admin_manual',
+    actorEmail,
+  });
+  return { result: approval.result, sessionId: approval.sessionId ?? sessionId, authorizationId: approval.authorizationId };
 }

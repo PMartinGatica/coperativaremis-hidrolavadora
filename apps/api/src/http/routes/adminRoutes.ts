@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { AppError, EmergencyStopSchema, MachinePatchSchema, SettingsPatchSchema, VehicleUpsertSchema } from '@hidro/shared';
+import { AppError, EmergencyStopSchema, MachinePatchSchema, PaymentReconcileManualSchema, SettingsPatchSchema, VehicleUpsertSchema } from '@hidro/shared';
 import type { AppContext } from '../../context.js';
 import { requireAdmin } from '../../auth/adminAuth.js';
 import {
@@ -16,6 +16,8 @@ import {
   listAdminSessions,
   listAdminVehicles,
   login,
+  reconcilePaymentAuto,
+  reconcilePaymentManual,
   rotateDeviceSecret,
   updateAdminMachine,
   updateSettings,
@@ -123,6 +125,20 @@ export function adminRoutes(ctx: AppContext): Router {
 
   r.get('/sessions/:sessionId', ah(async (req, res) => {
     res.json({ session: await getAdminSession(ctx, req.params.sessionId as string) });
+  }));
+
+  // ---------- reconciliación de pagos (Fase 1) — nunca autoriza sin consultar a MP ----------
+  /** Paso 1: "reintentar automáticamente" — sin ID, sin tipeo. */
+  r.post('/sessions/:sessionId/reconcile/auto', ah(async (req, res) => {
+    const result = await reconcilePaymentAuto(ctx, req.params.sessionId as string, req.admin?.email ?? 'admin');
+    res.json(result);
+  }));
+
+  /** Paso 2: aprobación manual con el ID real de pago de Mercado Pago. */
+  r.post('/sessions/:sessionId/reconcile/manual', ah(async (req, res) => {
+    const body = PaymentReconcileManualSchema.parse(req.body);
+    const result = await reconcilePaymentManual(ctx, req.params.sessionId as string, body.paymentId, req.admin?.email ?? 'admin');
+    res.json(result);
   }));
 
   // ---------- pagos ----------

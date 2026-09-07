@@ -10,6 +10,7 @@ import {
 import type { Db } from '../db/client.js';
 import type { AppConfig } from '../config.js';
 import type { Logger } from '../logger.js';
+import type { PaymentProvider } from '../payments/provider.js';
 import { adminUsers, payments, sessions as sessionsTable } from '../db/schema.js';
 import {
   deleteVehicle,
@@ -34,11 +35,13 @@ import { getActiveSessionForMachine } from '../repositories/repos.js';
 import { updateMachineFromAdmin } from './machineService.js';
 import { emergencyStopFromAdmin } from './deviceService.js';
 import { getDynamicSettings, updateDynamicSettings } from './settingsService.js';
+import { reconcileSessionAutomatic, reconcileSessionManual, type ReconcileResultType } from './paymentService.js';
 
 export interface AdminDeps {
   db: Db;
   config: AppConfig;
   logger: Logger;
+  provider: PaymentProvider;
 }
 
 export interface AdminUser {
@@ -476,4 +479,35 @@ export async function getQrUrl(deps: AdminDeps, machineId: string): Promise<{ ur
   const machine = await getMachine(deps.db, machineId);
   if (!machine) throw new AppError('MACHINE_NOT_FOUND', `Máquina no encontrada: ${machineId}`);
   return { url: `${deps.config.publicAppUrl}/machine/${machineId}`, machineId };
+}
+
+// ---------------------------------------------------------------- reconciliación de pagos (Fase 1)
+
+/** Mensajes en español para mesa de entrada — "specific error messages", no un genérico. */
+const RECONCILE_MESSAGES: Record<ReconcileResultType, string> = {
+  approved: 'Pago confirmado: la sesión quedó autorizada de nuevo. Avisale al cliente.',
+  duplicated: 'Este pago ya estaba resuelto antes; no se hizo ningún cambio.',
+  ignored: 'No se encontró ningún pago registrado para esta sesión.',
+  rejected: 'Mercado Pago reporta este pago como RECHAZADO.',
+  amount_mismatch: 'El importe informado por Mercado Pago no coincide con el de esta sesión.',
+  session_terminal: 'Esta sesión no admite reconciliación (no es un pago vencido recuperable).',
+  offline: 'La máquina está fuera de servicio; no se generó ninguna autorización.',
+  pending: 'Mercado Pago todavía reporta este pago como PENDIENTE.',
+  machine_occupied: 'La máquina ya está siendo usada por otro cliente ahora mismo.',
+  machine_used_since: 'La máquina ya se usó para otro cliente desde que este pago venció.',
+  not_found: 'Todavía no aparece ningún pago aprobado para esta sesión en Mercado Pago.',
+  ambiguous: 'Se encontraron varios pagos aprobados para esta sesión: posible cobro duplicado, requiere revisión manual antes de reconciliar.',
+  not_recoverable: 'Esta sesión no está en un estado que se pueda reconciliar.',
+  session_id_mismatch: 'Ese ID de pago no corresponde a esta sesión (revisá que sea el correcto).',
+  default_admin_forbidden: 'La cuenta de administrador por defecto no puede reconciliar pagos. Usá tu cuenta individual.',
+};
+
+export async function reconcilePaymentAuto(deps: AdminDeps, sessionId: string, actorEmail: string) {
+  const result = await reconcileSessionAutomatic(deps, sessionId, actorEmail);
+  return { ...result, message: RECONCILE_MESSAGES[result.result] };
+}
+
+export async function reconcilePaymentManual(deps: AdminDeps, sessionId: string, paymentId: string, actorEmail: string) {
+  const result = await reconcileSessionManual(deps, sessionId, paymentId, actorEmail);
+  return { ...result, message: RECONCILE_MESSAGES[result.result] };
 }

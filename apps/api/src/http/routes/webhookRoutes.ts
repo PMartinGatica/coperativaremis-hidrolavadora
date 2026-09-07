@@ -75,6 +75,7 @@ export function webhookRoutes(ctx: AppContext): Router {
       providerStatus: remote.status,
       providerRawStatus: remote.rawStatus,
       providerAmount: remote.amount,
+      source: 'webhook',
     });
     res.status(200).json({ ok: true, result: result.result });
   }));

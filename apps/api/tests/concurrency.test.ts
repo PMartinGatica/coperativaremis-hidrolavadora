@@ -24,6 +24,7 @@ describe('concurrencia y bloqueo de máquina (BUSY)', () => {
       providerStatus: 'APPROVED' as const,
       providerRawStatus: 'approved',
       providerAmount: checkout.payment.amount,
+      source: 'webhook' as const,
     };
     const [a, b] = await Promise.all([processApproval(t.ctx, input), processApproval(t.ctx, input)]);
     expect([a.result, b.result].sort()).toEqual(['approved', 'duplicated']);
