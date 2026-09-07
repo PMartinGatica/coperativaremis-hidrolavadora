@@ -30,3 +30,6 @@ test-results/
 
 # reportes locales de /cso (nunca al repo: quedan solo en la máquina que corrió el audit)
 .gstack/
+
+# snapshots locales de /retro (idem: solo la máquina que corrió el retro)
+.context/

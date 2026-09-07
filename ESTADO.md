@@ -1,19 +1,20 @@
 # ESTADO — MUNDO: HIDRO SELF-SERVICE
 
 > Handoff entre sesiones. Reescribir, no acumular. ≤40 líneas.
-> Última actualización: 2026-09-07 · HEAD `45388dd` · detalle completo en `ADR.md` (014–033)
+> Última actualización: 2026-09-07 · HEAD `2ff9273` · detalle completo en `ADR.md` (014–033)
 
 ## Arranque de la próxima sesión (después de borrar el chat)
 1. Entrá a `Madre/mundos/hidro-self-service/`, cargá SOLO este `ESTADO.md` + `CLAUDE.md` del
    Mundo (nunca dos Mundos en la misma sesión). `export GSTACK_PROJECT_SLUG=
    PMartinGatica-hidro-self-service` antes de la primera skill de gstack (ya fijado en
    `.claude/settings.json`, verificar si algo resuelve raro).
-2. **Fase 1 (reconciliación de pagos) construida y pusheada a `main` (ADR-033).** T1-T8
-   completas, `/review` + `/cso --code --diff` + `/qa` limpios, 91 tests verdes. Falta
-   `/retro` para cerrar formalmente el sprint — arrancá por ahí si no hay otra prioridad.
-3. **Puerta (b) todavía abierta:** `qa/FASE-1-manual.md` está escrito pero **nadie lo corrió
-   a mano todavía** — necesita el veredicto de Pablo (o el dueño) antes de dar la fase por
-   cerrada en los hechos, no solo en el código.
+2. **Fase 1 (reconciliación de pagos) construida, pusheada a `main` y con `/retro` corrido
+   (ADR-033).** T1-T8 completas, `/review` + `/cso --code --diff` + `/qa` limpios, 91 tests
+   verdes. El pipeline gstack de la fase está cerrado del todo lado código.
+3. **Leé `pendientes-manual.md` antes de asumir qué sigue.** Ahí está filtrado, corto y
+   accionable, todo lo que depende de una acción de Pablo/el dueño para que el Build pueda
+   seguir o para dar la Fase 1 por cerrada en los hechos (empieza por la puerta (b): nadie
+   corrió `qa/FASE-1-manual.md` todavía).
 
 ## Dónde estamos
 Código y memoria juntos acá, repo propio privado, todo pusheado (`main`, sin ramas/PRs — este
@@ -39,10 +40,7 @@ mesa de entrada lo reconcilia a mano (dos rutas admin nuevas, sin UI todavía, v
   `TODOS.md`, no cerrado.
 
 ## Pendientes humanos (en paralelo al Build)
-- **Correr `qa/FASE-1-manual.md` y marcar el veredicto** (puerta b, ver arriba).
-- App en Coolify → `docs/deploy-coolify.md`. Único paso para tener el backend vivo.
-- Respuestas de `mensajes/`: técnicos (relay + contactor) y dueño (ADR-007 + reembolso + cupo
-  diario + cuenta de MP). Aprovisionar cuentas individuales de `admin_users` para mesa de entrada
-  antes de producción (ADR-030/031) — hoy no hay ninguna ruta para crear una segunda cuenta.
-- Cuenta de desarrollador de MP + usuarios de prueba (ADR-018).
-- Puesta en marcha del hardware con Pablo presente, timer viejo como red.
+Ver `pendientes-manual.md` (filtrado a lo que bloquea seguir construyendo, se reescribe
+solo, no acá). Resumen de una línea: puerta (b) de Fase 1 sin correr, política de reembolso
+y ADR-007 sin decidir, credenciales de MP y cuentas de `admin_users` pendientes, Coolify y
+puesta en marcha del hardware fuera de mi alcance.
