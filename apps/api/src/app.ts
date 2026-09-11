@@ -1,3 +1,6 @@
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import express, { type Express } from 'express';
 import helmet from 'helmet';
@@ -51,22 +54,37 @@ export function buildApp(ctx: AppContext): Express {
   app.use('/api/webhooks', webhookRoutes(ctx));
   app.use('/api/demo', demoRoutes(ctx));
 
-  // Raíz: guía de endpoints (la API no tiene interfaz visual propia).
-  app.get('/', (_req, res) => {
-    res.json({
-      name: 'HIDRO SELF-SERVICE API',
-      mode: ctx.config.paymentProvider === 'demo' ? 'DEMO MODE' : 'MERCADO PAGO',
-      message: 'Esto es la API JSON. La interfaz web está en otra URL.',
-      web: ctx.config.publicAppUrl,
-      endpoints: {
-        health: '/health',
-        machine: '/api/public/machines/HIDRO-01',
-        clientUI: `${ctx.config.publicAppUrl}/machine/HIDRO-01`,
-        adminUI: `${ctx.config.publicAppUrl}/admin`,
-        deviceSimulator: `${ctx.config.publicAppUrl}/demo/device`,
-      },
+  // Deploy single-domain (ADR-035): si apps/web fue buildeada, se sirve como estático acá
+  // mismo — mismo dominio para API y producto visual. import.meta.url (no process.cwd())
+  // porque este archivo compila a apps/api/dist/app.js tanto en dev local como en la imagen
+  // Docker, y la ruta relativa a apps/web/dist es la misma en ambos casos.
+  const webDistDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../web/dist');
+  const webIndexHtml = path.join(webDistDir, 'index.html');
+  if (existsSync(webIndexHtml)) {
+    app.use(express.static(webDistDir));
+    // Ruteo client-side de React Router (/machine/:id, /admin/*, etc.): cualquier GET que no
+    // sea /api/* ni /health cae acá y sirve el mismo index.html.
+    app.get(/^\/(?!api\/)(?!health(?:\/|$)).*/, (_req, res) => {
+      res.sendFile(webIndexHtml);
     });
-  });
+  } else {
+    // Sin build de apps/web (dev local sin buildear, tests): guía de endpoints como antes.
+    app.get('/', (_req, res) => {
+      res.json({
+        name: 'HIDRO SELF-SERVICE API',
+        mode: ctx.config.paymentProvider === 'demo' ? 'DEMO MODE' : 'MERCADO PAGO',
+        message: 'Esto es la API JSON. La interfaz web está en otra URL.',
+        web: ctx.config.publicAppUrl,
+        endpoints: {
+          health: '/health',
+          machine: '/api/public/machines/HIDRO-01',
+          clientUI: `${ctx.config.publicAppUrl}/machine/HIDRO-01`,
+          adminUI: `${ctx.config.publicAppUrl}/admin`,
+          deviceSimulator: `${ctx.config.publicAppUrl}/demo/device`,
+        },
+      });
+    });
+  }
 
   app.use(notFoundHandler);
   app.use(errorHandler(ctx.logger));

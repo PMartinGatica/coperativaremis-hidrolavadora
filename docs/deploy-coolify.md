@@ -2,6 +2,10 @@
 
 > Estado al 2026-09-04: **la red ya está montada y verificada.** Lo único que falta es crear la
 > aplicación en Coolify. Ver ADR-021.
+>
+> **Actualizado 2026-09-10 (ADR-035):** el mismo dominio ahora sirve TODO — API + panel admin +
+> flujo del cliente (QR→pago). Antes solo se hubiera visto JSON en este link; ya no hace falta
+> un segundo deploy ni otro dominio para lo visual. Ver `docs/designs/deploy-web-estatico.md`.
 
 ## Lo que ya está hecho (no hay que repetirlo)
 
@@ -87,7 +91,10 @@ propia antes del primer arranque.
 ```bash
 curl https://hidro-api.insolvadev.com/health
 ```
-Tiene que devolver `{"status":"ok","database":"OK"}`. Si sigue dando `404 page not found`, el
+Tiene que devolver `{"status":"ok","database":"OK"}`. Además, abrir
+`https://hidro-api.insolvadev.com/` en el navegador tiene que mostrar la landing real (no el
+JSON de antes) — es el link que se le puede mandar al cliente para mostrarle el producto
+funcionando. Si sigue dando `404 page not found`, el
 problema es el router de Traefik (el dominio no quedó bien cargado en Coolify), no el túnel.
 
 ## ⚠️ Chequeo obligatorio de `TRUST_PROXY` (ADR-022)

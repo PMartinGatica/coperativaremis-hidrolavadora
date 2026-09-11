@@ -26,6 +26,10 @@ COPY --from=build /app/node_modules ./node_modules
 # Artefactos compilados + packages de workspaces (resuelven vía los symlinks)
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/drizzle ./apps/api/drizzle
+# apps/web/dist: apps/api lo sirve como estático (single-domain, ver
+# docs/designs/deploy-web-estatico.md) — dev-only/dev-autologin.html NUNCA está acá porque
+# vive fuera de apps/web/public/, la única carpeta que Vite copia a dist/.
+COPY --from=build /app/apps/web/dist ./apps/web/dist
 COPY --from=build /app/packages/shared/package.json ./packages/shared/package.json
 COPY --from=build /app/packages/shared/dist ./packages/shared/dist
 COPY --from=build /app/packages/state-machine/package.json ./packages/state-machine/package.json
