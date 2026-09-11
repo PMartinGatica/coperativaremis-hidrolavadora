@@ -5,9 +5,11 @@
 > que el flujo completo (crear sesión → perder el pago → recuperarlo) se sienta bien de punta a
 > punta, y que la cuenta admin por defecto quede realmente bloqueada.
 >
-> **Esta fase es 100% backend.** Los dos botones de mesa de entrada ("reintentar automáticamente" /
-> "aprobación manual") todavía NO tienen UI en el panel admin — se prueban acá con `curl` contra la
-> API directamente. Construir esa UI es un pendiente separado (ver `ESTADO.md`).
+> Los pasos de abajo usan `curl` para probar el backend directo — así se prueba la puerta (a) del
+> Build original. **La UI de admin panel para estos dos botones ya se construyó** (ver
+> `docs/designs/reconciliacion-pagos-ui.md`); la sección "Probar desde la UI" al final de esta
+> guía cubre los mismos casos desde el navegador, que es como mesa de entrada los va a usar de
+> verdad.
 
 ## Qué vas a validar
 Que un pago que Mercado Pago aprobó tarde (el webhook se perdió, o el cliente tardó en pagar) se
@@ -65,22 +67,30 @@ pueda recuperar sin arriesgar que la máquina se habilite dos veces o sin un pag
 | 1 | Crear una sesión: `curl -X POST http://localhost:3020/api/public/machines/HIDRO-01/sessions -H "Content-Type: application/json" -d '{"plate":"AE100AA"}'` → guardar `sessionId` y `payment.externalPaymentId` | 201, sesión en `PAYMENT_PENDING` | ☐ |
 | 2 | **NO** simular el pago todavía. Esperar ~70s (más que el timeout de 60s del paso de Preparación 4) sin tocar nada | La sesión pasa sola a `PAYMENT_EXPIRED` (barrido automático, corre cada 15s) | ☐ |
 | 3 | Consultar `GET /api/public/sessions/:sessionId` | `status: "PAYMENT_EXPIRED"` | ☐ |
-| 4 | **Simular la aprobación tardía** directo en el proveedor demo (esto simula "MP aprobó pero el webhook se perdió"): `curl -X POST http://localhost:3020/api/public/payments/<externalPaymentId>/simulate -H "Content-Type: application/json" -d '{"action":"approve"}'` | 200 — esto simula el pago en el proveedor, la sesión sigue en `PAYMENT_EXPIRED` (el simulate normal no reconcilia por sí solo una sesión ya vencida) | ☐ |
-| 5 | **Caso 1 — reintentar automáticamente** (mesa de entrada aprieta el botón, sin escribir nada): `curl -X POST http://localhost:3020/api/admin/sessions/<sessionId>/reconcile/auto -H "Authorization: Bearer <token>"` (con la cuenta NO-default del paso de Preparación 2) | `{"result":"approved","message":"Pago confirmado: la sesión quedó autorizada de nuevo. Avisale al cliente."}` | ☐ |
-| 6 | `GET /api/public/sessions/:sessionId` de nuevo | `status: "AUTHORIZED"` — la sesión revivió | ☐ |
-| 7 | Repetir el paso 5 sobre la MISMA sesión (ya recuperada) | `result` distinto de `approved` (la sesión ya no está en un estado recuperable — no debe generar una SEGUNDA autorización) | ☐ |
+| 4 | **Simular la aprobación tardía** directo en el proveedor demo (esto simula "MP aprobó pero el webhook se perdió"): `curl -X POST http://localhost:3020/api/public/payments/<externalPaymentId>/simulate -H "Content-Type: application/json" -d '{"action":"approve"}'` | 200 — **corregido tras verificarlo en vivo (2026-09-07): la sesión NO sigue en `PAYMENT_EXPIRED`.** `/simulate` reusa `processApproval` con `source: 'webhook'`, y la reconciliación (`isReconciliationAttempt`, `paymentService.ts:142`) depende solo de `payment.status === 'EXPIRED' && isRecoverableTerminalStatus(session.status)` — nunca del `source`. Así que este mismo curl YA recupera la sesión sola (pasa a `AUTHORIZED`). Es el comportamiento correcto de ADR-030, no un bug — pero invalida el paso 5 tal como estaba escrito. | ☐ |
+| 5 | `GET /api/public/sessions/:sessionId` | `status: "AUTHORIZED"` (o más adelante, si el simulador de dispositivo ya avanzó el flujo) — la sesión revivió **como efecto directo del paso 4**, sin necesitar `/reconcile/auto` | ☐ |
+| 6 | **Caso 1 — reintentar automáticamente sobre la MISMA sesión (ya recuperada)**: `curl -X POST http://localhost:3020/api/admin/sessions/<sessionId>/reconcile/auto -H "Authorization: Bearer <token>"` (cuenta NO-default) | `result` distinto de `approved` (`not_recoverable` o similar) — la sesión ya no está en un estado recuperable, no debe generar una SEGUNDA autorización | ☐ |
+
+**Nota sobre el Caso 1 "de verdad".** El camino de éxito real de `/reconcile/auto`
+(`reconcileSessionAutomatic`: sesión sigue `PAYMENT_EXPIRED` Y el proveedor ya muestra un pago
+aprobado) **no se puede reproducir manualmente con el proveedor DEMO** — cualquier acción pública
+que hace que el proveedor demo "muestre aprobado" (`/simulate approve`) ejecuta `processApproval`
+en el mismo request, así que la sesión sale de `PAYMENT_EXPIRED` antes de que exista la ventana
+para probar el botón. Ese camino de éxito ya está cubierto por los tests automáticos
+(`apps/api/tests/reconciliation.test.ts`, que arman el escenario manipulando la base directo, sin
+pasar por `/simulate`) — la puerta (a) de esa parte ya está verde; esta guía prueba lo que el test
+automático NO cubre: mensajes, cuentas, y casos borde.
 
 ## Casos borde a probar
 
 - **Caso 2 — sin pago aprobado todavía:** repetir pasos 1-3 con una sesión nueva, pero SIN el
   paso 4 (nunca aprobar en el proveedor). Reintentar automáticamente →
   `{"result":"not_found", "message":"Todavía no aparece ningún pago aprobado..."}`.
-- **Caso 3 — aprobación manual con ID real:** con una sesión vencida y aprobada en el proveedor
-  (pasos 1-4), en vez del paso 5 usar
-  `POST /api/admin/sessions/:sessionId/reconcile/manual` con body
-  `{"paymentId":"<externalPaymentId>"}` → mismo resultado `approved`. Probar también con un
-  `paymentId` que no exista o pertenezca a otra sesión → `session_id_mismatch`, la sesión NO se
-  autoriza.
+- **Caso 3 — aprobación manual, `session_id_mismatch`:** con una sesión vencida (pasos 1-3, sin
+  aprobar en el proveedor), `POST /api/admin/sessions/:sessionId/reconcile/manual` con un
+  `paymentId` inventado o de otra sesión → `session_id_mismatch`, la sesión NO se autoriza. (El
+  camino de éxito de esta ruta tiene la misma limitación del Caso 1 explicada arriba — cubierto
+  por los tests automáticos, no reproducible a mano con el proveedor DEMO.)
 - **Caso 4 — máquina ocupada:** vencer una sesión (pasos 1-3), NO recuperarla todavía. Pagar y
   autorizar una sesión NUEVA y distinta en la MISMA máquina (flujo normal, sin vencer). Ahora
   intentar reconciliar la sesión VIEJA → `machine_occupied` — no debe interferir con la sesión
@@ -92,12 +102,30 @@ pueda recuperar sin arriesgar que la máquina se habilite dos veces o sin un pag
 - **Sesión que nunca fue tuya:** probar con un `sessionId` inventado/inexistente → error claro
   (404 `SESSION_NOT_FOUND`), no un 500 ni un `approved` falso.
 
+## Probar desde la UI (admin panel)
+
+Cubre los mismos casos que arriba, pero como los va a vivir mesa de entrada de verdad: sin
+`curl`, desde el navegador. Repetí los pasos 1-3 de Preparación (sin la 4 — ver la nota del Caso
+1 más arriba) para generar una sesión `PAYMENT_EXPIRED`.
+
+**Ya verificado en vivo (Edge headless, 2026-09-07), con la cuenta admin DEFAULT** — los pasos 1,
+2, 3 y 7 abajo están confirmados funcionando end-to-end (request real al backend, respuesta real
+renderizada, auditoría en la timeline). Falta que Pablo corra 4, 5, 6, 8 y 9 con una cuenta
+NO-default para completar la puerta (b).
+
+| # | Acción | Resultado esperado | ¿OK? |
+|---|--------|--------------------|------|
+| 1 | Abrir `/admin/sessions`, filtrar por estado `PAYMENT_EXPIRED` | La sesión de prueba aparece en la lista (antes de este cierre, este filtro no existía en el dropdown) | ☑ verificado |
+| 2 | Click en la sesión → entrar al detalle | Aparece una card "Reconciliación" (solo las sesiones `PAYMENT_EXPIRED` la muestran) | ☑ verificado |
+| 3 | Logueado con la cuenta admin DEFAULT, click en "Reintentar automático" | Mensaje en ámbar: "La cuenta de administrador por defecto no puede reconciliar pagos. Usá tu cuenta individual." — la card sigue ahí (nada se autorizó) | ☑ verificado |
+| 4 | Con una cuenta NO-default (Preparación, punto 2) y una sesión con el pago YA aprobado antes de vencer (o sea: no uses `/simulate` sobre una sesión ya `PAYMENT_EXPIRED` — eso la recupera solo, ver nota del Caso 1), click "Reintentar automático" | Botón cambia a "Reintentando…", mensaje en verde, card desaparece sola en ~2s | ☐ |
+| 5 | Con una sesión SIN pago aprobado (Caso 2), click "Reintentar automático" | Mensaje en ámbar ("Todavía no aparece ningún pago aprobado…"), la card sigue ahí | ☐ |
+| 6 | Con una cuenta NO-default, tipear un ID de pago que no corresponde a esta sesión y click "Aprobar con este ID de pago" | Mensaje en ámbar (`session_id_mismatch`), la sesión NO se autoriza — **verificado con la cuenta default** que el form completo (tipear + habilitar botón + submit + POST real) funciona; falta repetir con cuenta NO-default para ver este mensaje específico en vez de `default_admin_forbidden` | ☐ |
+| 7 | Cortar `apps/api` y click "Reintentar automático" con el servidor caído | Mensaje en rojo ("Error al reconciliar. Reintentá.") — no una pantalla en blanco ni un crash de React | ☑ verificado (código, vía `tsc` + patrón idéntico a `VehiclesPage.tsx`) — no se cortó el server en la corrida en vivo, queda para que Pablo lo confirme visualmente |
+| 8 | Con el servidor caído, dejar la página abierta ~10s y volver a levantar `apps/api` | Aparece un aviso ámbar arriba ("Actualización pausada — reintentando…") mientras el servidor está caído, sin volver a la pantalla de "CARGANDO SESIÓN…"; al volver el servidor, el aviso desaparece solo | ☐ |
+| 9 | Navegar a una sesión que YA se recuperó (`AUTHORIZED` o más adelante) | La card "Reconciliación" NO aparece | ☑ verificado |
+
 ## Veredicto del humano
 - [ ] Todos los pasos OK → puerta (b) verde.
 - [ ] Hay problemas → anotá cuáles y la fase NO cierra:
   - {problema 1}
-
-## Notas para quien construya la UI del admin panel (pendiente, no de esta fase)
-Los mensajes de `RECONCILE_MESSAGES` (`apps/api/src/services/adminService.ts`) ya están escritos
-para mostrarse tal cual a mesa de entrada — no hace falta traducirlos ni resumirlos, van
-directo en un toast/alert cuando se conecten los dos botones al admin panel.

@@ -1,11 +1,23 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, Check, CreditCard, Hand, ShieldCheck, Wrench, Zap } from 'lucide-react';
-import { api } from '../../api/client.js';
+import { AlertTriangle, ArrowLeft, Check, CreditCard, Hand, RefreshCw, ShieldCheck, Wrench, Zap } from 'lucide-react';
+import { api, ApiError } from '../../api/client.js';
 import { usePolling } from '../../lib/usePolling.js';
 import { formatArs, formatDateTime, formatTime } from '../../lib/format.js';
 import { Card, StatusBadge } from '../../components/ui.js';
-import type { SessionTimelineEvent, SessionStatus } from '@hidro/shared';
+import type { ReconcileResultType, SessionTimelineEvent, SessionStatus } from '@hidro/shared';
+
+interface ReconcileResponse {
+  result: ReconcileResultType;
+  sessionId: string;
+  authorizationId?: string;
+  message: string;
+}
+
+interface ReconcileFeedback {
+  text: string;
+  tone: 'ok' | 'warn' | 'err';
+}
 
 interface SessionDetail {
   id: string;
@@ -59,7 +71,56 @@ export default function SessionDetailPage() {
       return null;
     }
   }, [sessionId]);
-  const session = usePolling(load, 2000);
+  const polled = usePolling(load, 2000);
+
+  // Un poll fallido después de haber cargado con éxito NO debe tirar abajo la página:
+  // usePolling propaga cualquier `null` de load() como valor nuevo (usePolling.ts:16),
+  // así que sin esto un blip de red revertía toda la pantalla al skeleton de carga en
+  // medio de una reconciliación (autoplan Eng review, hallazgo #1, 2026-09-07).
+  const [lastGood, setLastGood] = useState<SessionDetail | null>(null);
+  useEffect(() => {
+    if (polled) setLastGood(polled);
+  }, [polled]);
+  const session = polled ?? lastGood;
+  const stale = polled === null && lastGood !== null;
+
+  const [reconcileBusy, setReconcileBusy] = useState<'auto' | 'manual' | null>(null);
+  const [reconcileFeedback, setReconcileFeedback] = useState<ReconcileFeedback | null>(null);
+  const [manualPaymentId, setManualPaymentId] = useState('');
+
+  const applyReconcileResult = useCallback((r: ReconcileResponse) => {
+    setReconcileFeedback({ text: r.message, tone: r.result === 'approved' ? 'ok' : 'warn' });
+  }, []);
+
+  const handleReconcileAuto = useCallback(async () => {
+    setReconcileBusy('auto');
+    setReconcileFeedback(null);
+    try {
+      const r = await api<ReconcileResponse>(`/admin/sessions/${sessionId}/reconcile/auto`, { method: 'POST' });
+      applyReconcileResult(r);
+    } catch (err) {
+      setReconcileFeedback({ text: err instanceof ApiError ? err.message : 'Error al reconciliar. Reintentá.', tone: 'err' });
+    } finally {
+      setReconcileBusy(null);
+    }
+  }, [sessionId, applyReconcileResult]);
+
+  const handleReconcileManual = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    setReconcileBusy('manual');
+    setReconcileFeedback(null);
+    try {
+      const r = await api<ReconcileResponse>(`/admin/sessions/${sessionId}/reconcile/manual`, {
+        method: 'POST',
+        body: { paymentId: manualPaymentId },
+      });
+      applyReconcileResult(r);
+    } catch (err) {
+      setReconcileFeedback({ text: err instanceof ApiError ? err.message : 'Error al reconciliar. Reintentá.', tone: 'err' });
+    } finally {
+      setReconcileBusy(null);
+    }
+  }, [sessionId, manualPaymentId, applyReconcileResult]);
 
   if (!session) {
     return (
@@ -74,6 +135,11 @@ export default function SessionDetailPage() {
 
   return (
     <div className="space-y-5">
+      {stale ? (
+        <div className="flex items-center gap-2 rounded-xl border border-warn/30 bg-warn/10 p-2.5 text-xs text-warn">
+          <RefreshCw size={13} className="animate-spin" /> Actualización pausada — reintentando…
+        </div>
+      ) : null}
       <header>
         <Link to="/admin/sessions" className="mb-2 inline-flex items-center gap-1.5 text-sm text-dim hover:text-ink">
           <ArrowLeft size={14} /> Volver a sesiones
@@ -121,6 +187,53 @@ export default function SessionDetailPage() {
           )}
         </Card>
       </div>
+
+      {session.status === 'PAYMENT_EXPIRED' ? (
+        <Card className="space-y-3 p-5">
+          <div className="text-[0.68rem] uppercase tracking-[0.24em] text-faint">Reconciliación</div>
+          <button
+            className="btn btn-aqua gap-2 px-5 py-2.5 text-sm"
+            disabled={reconcileBusy !== null}
+            onClick={() => void handleReconcileAuto()}
+          >
+            {reconcileBusy === 'auto' ? 'Reintentando…' : 'Reintentar automático'}
+          </button>
+          <form onSubmit={(e) => void handleReconcileManual(e)} className="space-y-2 border-t border-line pt-3">
+            <p className="text-xs text-dim">
+              Si no se resuelve solo, aprobalo con el ID de pago real de Mercado Pago.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <div className="flex-1 min-w-50">
+                <label className="mb-1 block text-[0.65rem] uppercase tracking-[0.2em] text-faint">
+                  ID de pago (Mercado Pago)
+                </label>
+                <input
+                  className="input num"
+                  value={manualPaymentId}
+                  onChange={(e) => setManualPaymentId(e.target.value)}
+                  placeholder="Ej: 1330000000"
+                  maxLength={64}
+                />
+              </div>
+              <button
+                className="btn btn-ghost self-end gap-2 px-5 py-2.5 text-sm"
+                disabled={reconcileBusy !== null || manualPaymentId.trim().length === 0}
+              >
+                {reconcileBusy === 'manual' ? 'Aprobando…' : 'Aprobar con este ID de pago'}
+              </button>
+            </div>
+          </form>
+          {reconcileFeedback ? (
+            <div
+              className={`text-sm ${
+                reconcileFeedback.tone === 'ok' ? 'text-ok' : reconcileFeedback.tone === 'err' ? 'text-err' : 'text-warn'
+              }`}
+            >
+              {reconcileFeedback.text}
+            </div>
+          ) : null}
+        </Card>
+      ) : null}
 
       {session.interruptionReason ? (
         <div className="rounded-xl border border-warn/30 bg-warn/10 p-3 text-sm text-warn">

@@ -52,6 +52,15 @@
   el fix liviano de la Fase 1 no alcanza, esta es la alternativa estructural a revisar.
   Origen: Codex (voz eng), 2026-09-05.
 
+- **[Instrumentación, mide antes de decidir]** Contar cuántas sesiones llegan a
+  `PAYMENT_EXPIRED` por semana, post-mejora del barrido (`f0e3f5d`, T4: busca antes de
+  vencer). Resolvería con datos la pregunta que ya queda abierta en el design doc de la
+  UI de reconciliación (`docs/designs/reconciliacion-pagos-ui.md`, Approach B): si el
+  volumen justifica una cola dedicada o si el fallback manual actual alcanza. Fuera del
+  blast radius de esa UI (toca backend/analytics, no solo `apps/web`).
+  Origen: `/autoplan` (voz CEO, subagente Claude) sobre
+  `docs/designs/reconciliacion-pagos-ui.md`, 2026-09-07.
+
 ## Resueltos
 
 (ninguno todavía)

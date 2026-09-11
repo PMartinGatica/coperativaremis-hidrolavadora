@@ -443,3 +443,41 @@ export type SimulatorAction =
   | 'power_cut'
   | 'device_error'
   | 'clear_error';
+
+// ---------- Aprobación / reconciliación de pagos (Fase 1, ADR-023/029/030) ----------
+// Compartido entre apps/api (fuente de verdad) y apps/web (UI de reconciliación) para
+// que un typo o una variante renombrada rompa en tsc en los dos workspaces, no en
+// silencio en runtime (autoplan Eng review, 2026-09-07).
+export type ApprovalResultType =
+  | 'approved'
+  | 'duplicated'
+  | 'ignored'
+  | 'rejected'
+  | 'amount_mismatch'
+  | 'session_terminal'
+  | 'offline'
+  | 'pending'
+  /** Sub-caso A de la recuperación (ADR-030): otra sesión sigue ACTIVA en la máquina. */
+  | 'machine_occupied'
+  /** Sub-caso B de la recuperación (ADR-030): la máquina ya se usó para otro cliente desde entonces. */
+  | 'machine_used_since';
+
+export interface ApprovalResult {
+  result: ApprovalResultType;
+  sessionId?: string;
+  authorizationId?: string;
+}
+
+export type ReconcileResultType =
+  | ApprovalResultType
+  | 'not_found'
+  | 'ambiguous'
+  | 'not_recoverable'
+  | 'session_id_mismatch'
+  | 'default_admin_forbidden';
+
+export interface ReconcileResult {
+  result: ReconcileResultType;
+  sessionId: string;
+  authorizationId?: string;
+}

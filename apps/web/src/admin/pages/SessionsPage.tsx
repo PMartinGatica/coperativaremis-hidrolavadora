@@ -56,7 +56,7 @@ export default function SessionsPage() {
           </select>
           <select className="input w-auto py-2 text-xs" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="">Todos los estados</option>
-            {['RUNNING', 'FINISHED', 'WAITING_FOR_BUTTON', 'PAYMENT_PENDING', 'PAYMENT_FAILED', 'SESSION_INTERRUPTED', 'EMERGENCY_STOP', 'DEVICE_ERROR', 'AUTHORIZATION_EXPIRED'].map((s) => (
+            {['RUNNING', 'FINISHED', 'WAITING_FOR_BUTTON', 'PAYMENT_PENDING', 'PAYMENT_FAILED', 'PAYMENT_EXPIRED', 'SESSION_INTERRUPTED', 'EMERGENCY_STOP', 'DEVICE_ERROR', 'AUTHORIZATION_EXPIRED'].map((s) => (
               <option key={s} value={s}>{s}</option>
             ))}
           </select>

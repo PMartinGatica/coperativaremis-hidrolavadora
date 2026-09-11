@@ -1,4 +1,12 @@
-import { AppError, type PaymentStatus, type SessionStatus } from '@hidro/shared';
+import {
+  AppError,
+  type PaymentStatus,
+  type SessionStatus,
+  type ApprovalResultType,
+  type ApprovalResult,
+  type ReconcileResultType,
+  type ReconcileResult,
+} from '@hidro/shared';
 import type { Db } from '../db/client.js';
 import type { AppConfig } from '../config.js';
 import type { Logger } from '../logger.js';
@@ -30,19 +38,11 @@ export interface PaymentDeps {
   provider: PaymentProvider;
 }
 
-export type ApprovalResultType =
-  | 'approved'
-  | 'duplicated'
-  | 'ignored'
-  | 'rejected'
-  | 'amount_mismatch'
-  | 'session_terminal'
-  | 'offline'
-  | 'pending'
-  /** Sub-caso A de la recuperación (ADR-030): otra sesión sigue ACTIVA en la máquina. */
-  | 'machine_occupied'
-  /** Sub-caso B de la recuperación (ADR-030): la máquina ya se usó para otro cliente desde entonces. */
-  | 'machine_used_since';
+// ApprovalResultType/ApprovalResult movidos a @hidro/shared (autoplan Eng review,
+// 2026-09-07): la UI de reconciliación los necesita del lado frontend, y un typo o una
+// variante renombrada ahora rompe en tsc en los dos workspaces, no en silencio en
+// runtime. Re-exportados acá para no tocar los imports existentes de este módulo.
+export type { ApprovalResultType, ApprovalResult, ReconcileResultType, ReconcileResult };
 
 /**
  * Quién dispara esta aprobación — explícito, nunca inferido dentro de la función
@@ -64,12 +64,6 @@ export interface ApprovalInput {
   source: ApprovalSource;
   /** Solo para source='admin_recheck'/'admin_manual': quién ejecuta la acción (auditoría). */
   actorEmail?: string;
-}
-
-export interface ApprovalResult {
-  result: ApprovalResultType;
-  sessionId?: string;
-  authorizationId?: string;
 }
 
 /** ¿Es este el intento de reconciliación de un pago aprobado tardío (ADR-023/030)? */
@@ -533,20 +527,6 @@ export async function refundPayment(deps: PaymentDeps, externalPaymentId: string
 // "reintentar automáticamente" reusa searchByExternalReference (sin ID, sin tipeo);
 // "aprobación manual" exige el ID real de pago (getPaymentById), nunca un checkbox.
 // ==================================================================================
-
-export type ReconcileResultType =
-  | ApprovalResultType
-  | 'not_found'
-  | 'ambiguous'
-  | 'not_recoverable'
-  | 'session_id_mismatch'
-  | 'default_admin_forbidden';
-
-export interface ReconcileResult {
-  result: ReconcileResultType;
-  sessionId: string;
-  authorizationId?: string;
-}
 
 /**
  * Cuenta compartida por defecto = auditoría decorativa (Eng review, hallazgo #4): mesa
