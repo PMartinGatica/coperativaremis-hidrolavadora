@@ -479,3 +479,90 @@
   regresiones), `/review` + `/cso --code --diff` + `/qa` (sustituido por guía manual,
   fase 100% backend sin UI todavía) limpios. Pendiente explícito: `qa/FASE-1-manual.md`
   necesita el veredicto de Pablo corriéndola a mano — puerta (b) abierta hasta entonces.
+
+- **2026-09-07 — ADR-034: UI de admin panel para reconciliación de pagos, construida y
+  verificada en vivo. Pipeline completo: `/office-hours` → `/autoplan` (CEO+Design+Eng,
+  Codex no disponible en esta máquina por un bloqueo de sandbox de PowerShell — corrió
+  subagente-Claude-solo en las 3 fases) → Build → verificación en navegador real.**
+  Diseño: `docs/designs/reconciliacion-pagos-ui.md`. Alcance: card "Reconciliación" en
+  `SessionDetailPage.tsx` (visible solo si `status === 'PAYMENT_EXPIRED'`, botón auto +
+  form manual) + filtro `PAYMENT_EXPIRED` agregado a `SessionsPage.tsx` (faltaba en el
+  dropdown). Cero cambios de comportamiento del backend.
+  **Dos hallazgos reales del Eng review, sumados al alcance:** (1) `SessionDetailPage`'s
+  `load()` devolvía `null` en cualquier catch, y `usePolling` propaga ese `null` como
+  valor nuevo — un solo poll fallido después de cargar bien revertía toda la pantalla al
+  skeleton de carga, justo en medio de una reconciliación. Fix: estado `lastGood`,
+  `session = polled ?? lastGood`, aviso no bloqueante en vez de skeleton. (2)
+  `ReconcileResultType`/`ApprovalResultType` vivían solo en `apps/api`, sin ligazón de
+  tipos con el frontend — un typo o una variante renombrada fallaba en silencio en
+  runtime, no en build. Movidos a `packages/shared/src/types.ts` (cambio de tipos, cero
+  comportamiento), `paymentService.ts` los re-exporta para no tocar sus consumidores.
+  **Hallazgo operativo de la verificación en navegador (Edge headless vía CDP, no
+  simulado):** `/api/public/payments/:id/simulate` con `action:"approve"` llama a
+  `processApproval` con `source:'webhook'`, y la reconciliación (`isReconciliationAttempt`,
+  `paymentService.ts:142`) depende solo de `payment.status === 'EXPIRED' &&
+  isRecoverableTerminalStatus(session.status)` — nunca del `source`. Consecuencia: **no
+  hay forma de reproducir a mano, vía API pública del proveedor DEMO, el escenario "el
+  proveedor ya muestra aprobado pero la sesión sigue `PAYMENT_EXPIRED`"** — cualquier
+  `/simulate approve` recupera la sesión en el mismo request. `qa/FASE-1-manual.md`
+  (Casos 1/3, escritos en la Fase 1 original) asumían lo contrario; corregido en el mismo
+  cierre. El camino de éxito real de `reconcileSessionAutomatic`/`Manual` sigue cubierto
+  por `apps/api/tests/reconciliation.test.ts` (arma el escenario manipulando la base
+  directo, sin pasar por `/simulate`) — la puerta (a) de esa parte ya estaba verde antes
+  de este hallazgo, esto solo corrige la documentación de cómo probarlo a mano.
+  **Verificado en navegador real (Edge headless, no unit tests):** card visible solo en
+  `PAYMENT_EXPIRED` ✓, oculta en sesión ya resuelta ✓, click en "Reintentar automático" →
+  request real a `/reconcile/auto` → mensaje `default_admin_forbidden` renderizado en
+  ámbar, card persiste ✓, form manual (tipear ID + habilitar botón + submit) → request
+  real a `/reconcile/manual` ✓, timeline de la sesión muestra la auditoría
+  ("Reconciliación denegada (cuenta compartida)") sin logging nuevo ✓. El camino
+  `approved` (mensaje verde, card desaparece) no se pudo disparar por el mismo motivo del
+  hallazgo de arriba — queda para que Pablo lo confirme con una cuenta NO-default
+  siguiendo `qa/FASE-1-manual.md`. `npm run build` limpio, `tsc --noEmit` limpio en
+  `apps/web`, 91 tests preexistentes siguen verdes (84 api + 7 state-machine) tras el
+  refactor de tipos. **Dependencia de negocio que este código NO resuelve** (hallazgo de
+  la voz CEO de `/autoplan`): mesa de entrada sigue sin cuentas `admin_users`
+  individuales — la UI queda construida y correcta pero sin uso real hasta que esas
+  cuentas existan (`pendientes-manual.md` §3).
+
+- **2026-09-10 — ADR-035: single-domain deploy — `apps/api` sirve el build estático de
+  `apps/web`. Pipeline completo: `/office-hours` (condensado, decisión ya tomada por
+  Pablo vía AskUserQuestion) → `/autoplan` (CEO+Eng; Design y DX skippeados con
+  justificación — sin componentes/pantallas nuevos y sin superficie de API nueva
+  respectivamente; Codex sigue bloqueado en esta máquina, degradado a subagente-Claude) →
+  Build → verificación en navegador real contra el build de producción.**
+  Origen: Pablo preguntó si `hidro-api.insolvadev.com` ya servía para mostrarle el
+  producto a su cliente (la cooperativa). Verificado con `curl`: seguía dando el 404 de
+  Traefik documentado desde ADR-021 (la app de Coolify nunca se creó) — y aunque se
+  creara, el `Dockerfile` solo empaquetaba `apps/api/dist`, nunca `apps/web/dist`; cero
+  puente entre ambos (`express.static` no aparecía en ningún lado del código).
+  Diseño: `docs/designs/deploy-web-estatico.md`. Alcance: `apps/api/src/app.ts` monta
+  `express.static(apps/web/dist)` + fallback SPA (regex que excluye `/api/*` y `/health`)
+  si `apps/web/dist/index.html` existe (resuelto vía `import.meta.url`, no `process.cwd()`
+  — misma ruta relativa en dev local y en la imagen Docker); si no existe, se mantiene la
+  guía JSON de siempre (dev sin buildear, tests). `Dockerfile` copia `apps/web/dist` al
+  stage de runtime.
+  **Hallazgo real del Eng review (segunda voz, subagente sin contexto previo, verificado
+  por mí leyendo el archivo):** `apps/web/public/dev-autologin.html` (helper de dev que
+  auto-loguea con `admin@hidro.local`/`hidro-demo-2025` hardcodeados) quedaba copiado tal
+  cual a `dist/` por Vite (todo `public/` se copia sin condición) — con este cambio, esas
+  credenciales admin habrían quedado públicas en el mismo link que se le manda al cliente.
+  Fix: archivo movido a `apps/web/dev-only/` (fuera de `public/`) + un plugin de Vite
+  (`configureServer`, solo corre en `vite dev`, nunca en `vite build`) que lo sigue
+  sirviendo en local sin que pueda llegar al build de producción — `scripts/check-render.mjs`
+  (que lo usa contra el dev server) no necesitó cambios. Segundo hallazgo menor: el regex
+  de fallback tenía una asimetría (`(?!health)` sin límite de palabra, excluía de más
+  rutas como `/healthcheck`) — corregido a `(?!health(?:\/|$))`.
+  **Verificado en vivo, no solo `tsc`:** build completo limpio, `tsc --noEmit` limpio,
+  arranque del build real (`node dist/index.js`, no el dev server de Vite) + navegación
+  real Edge headless a `/`, `/machine/HIDRO-01`, `/admin` → las 3 cargan la SPA real sin
+  errores de consola (CSP incluido, helmet default no bloquea el build de Vite). `curl` a
+  `/dev-autologin.html` contra el build de producción confirma que la credencial YA NO
+  está — la ruta cae en el fallback SPA (200, pero es el `index.html`, no el archivo
+  filtrado). `/health` y `/api/*` (incluido un 404 real de API) siguen devolviendo JSON
+  exactamente igual que antes. Grep confirmó que ningún test existente pega a `GET /`, así
+  que el cambio de esa ruta no tiene riesgo de regresión de cobertura.
+  **Fuera de alcance, acción de Pablo:** crear la app en Coolify sigue sin acceso propio
+  (`pendientes-manual.md` §4) — este trabajo deja el repo listo para que, cuando se haga,
+  el mismo link ya muestre el producto completo. `docs/deploy-coolify.md` actualizado con
+  esa nota y el chequeo visual post-deploy.
