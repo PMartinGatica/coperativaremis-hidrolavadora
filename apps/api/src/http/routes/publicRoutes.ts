@@ -6,13 +6,16 @@ import { createSessionWithPayment, getSessionState } from '../../services/sessio
 import { getPaymentPublicInfo, simulateDemoPayment } from '../../services/paymentService.js';
 import { insertAudit } from '../../repositories/repos.js';
 import { ah } from '../asyncHandler.js';
-import { createPaymentCreationRateLimit, createSimulateRateLimit } from '../middleware.js';
+import { createPaymentCreationRateLimit, createPinAttemptRateLimit, createSimulateRateLimit } from '../middleware.js';
 
 export function publicRoutes(ctx: AppContext): Router {
   const r = Router();
   // Fábricas: cada instancia de app tiene sus propios limiters (no se comparte cuota).
   const paymentCreationRateLimit = createPaymentCreationRateLimit();
   const simulateRateLimit = createSimulateRateLimit();
+  // Por patente (no por IP): sin esto, agotar los 10.000 PINs contra UNA patente conocida
+  // era viable en horas (hallazgo del Eng review, docs/designs/pin-patente-remis-socio.md).
+  const pinAttemptRateLimit = createPinAttemptRateLimit();
 
   r.get('/machines', ah(async (_req, res) => {
     res.json({ machines: await listPublicMachines(ctx) });
@@ -24,18 +27,18 @@ export function publicRoutes(ctx: AppContext): Router {
   }));
 
   /** Cotización de tarifa por patente (NO crea nada, NO cobra). */
-  r.post('/machines/:machineId/quote', ah(async (req, res) => {
+  r.post('/machines/:machineId/quote', pinAttemptRateLimit, ah(async (req, res) => {
     const { machineId } = QuoteParamsSchema.parse({ machineId: req.params.machineId });
-    const { plate } = PlateBodySchema.parse(req.body);
-    res.json({ quote: await quotePlate(ctx, machineId, plate) });
+    const { plate, pin } = PlateBodySchema.parse(req.body);
+    res.json({ quote: await quotePlate(ctx, machineId, plate, pin) });
   }));
 
   /** Crear sesión + cobro. El backend re-valida máquina, tarifa y límite diario de la patente. */
-  r.post('/machines/:machineId/sessions', paymentCreationRateLimit, ah(async (req, res) => {
+  r.post('/machines/:machineId/sessions', paymentCreationRateLimit, pinAttemptRateLimit, ah(async (req, res) => {
     const { machineId } = CreateSessionParamsSchema.parse({ machineId: req.params.machineId });
-    const { plate } = PlateBodySchema.parse(req.body);
+    const { plate, pin } = PlateBodySchema.parse(req.body);
     try {
-      const checkout = await createSessionWithPayment(ctx, machineId, plate);
+      const checkout = await createSessionWithPayment(ctx, machineId, plate, pin);
       res.status(201).json({ checkout });
     } catch (err) {
       if (err instanceof AppError && err.code === 'MACHINE_BUSY') {

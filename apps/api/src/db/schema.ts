@@ -43,6 +43,9 @@ export const vehicles = pgTable(
     plate: text('plate').notNull(),
     category: text('category').$type<'remis' | 'socio'>().notNull(),
     ownerName: text('owner_name'),
+    /** Hash (hashSecret) del PIN de 4 dígitos. NULL = sin PIN (grandfather clause: no se
+     *  exige hasta que un admin le asigne uno). Nunca se guarda en claro. */
+    pin: text('pin'),
     enabled: boolean('enabled').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

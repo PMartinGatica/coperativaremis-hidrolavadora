@@ -61,15 +61,21 @@ export async function listVehicles(db: Db) {
 
 export async function upsertVehicle(
   db: Db,
-  data: { plate: string; category: 'remis' | 'socio'; ownerName: string | null },
+  data: {
+    plate: string;
+    category: 'remis' | 'socio';
+    ownerName: string | null;
+    /** Tri-estado: undefined = no tocar el PIN existente; null = borrarlo; string = setearlo
+     *  (ya hasheado por el llamador, acá se guarda tal cual). */
+    pinHash?: string | null;
+  },
 ) {
+  const set: Record<string, unknown> = { category: data.category, ownerName: data.ownerName, updatedAt: new Date() };
+  if (data.pinHash !== undefined) set.pin = data.pinHash;
   const rows = await db
     .insert(vehicles)
-    .values({ id: uuid(), ...data })
-    .onConflictDoUpdate({
-      target: vehicles.plate,
-      set: { category: data.category, ownerName: data.ownerName, updatedAt: new Date() },
-    })
+    .values({ id: uuid(), plate: data.plate, category: data.category, ownerName: data.ownerName, pin: data.pinHash ?? null })
+    .onConflictDoUpdate({ target: vehicles.plate, set })
     .returning();
   return rows[0] as (typeof rows)[number];
 }

@@ -13,6 +13,7 @@ import {
 import type { Db } from '../db/client.js';
 import type { AppConfig } from '../config.js';
 import { sessions as sessionsTable } from '../db/schema.js';
+import { verifySecret } from '../db/seed.js';
 import {
   countWashesToday,
   getActiveSessionForMachine,
@@ -102,29 +103,46 @@ export async function listPublicMachines(deps: MachineDeps) {
   return result;
 }
 
-/** Categoría y tarifa de una patente (registro de admin; lo no registrado = externo). */
+/** El PIN es prueba de posesión de la patente (remis/socio), no identidad fuerte.
+ *  Grandfather clause: una fila sin PIN seteado no lo exige (ADR pendiente de numerar). */
+function pinOk(vehicle: { pin: string | null } | null, providedPin?: string): boolean {
+  if (!vehicle?.pin) return true;
+  return providedPin != null && verifySecret(providedPin, vehicle.pin);
+}
+
+/** Categoría y tarifa de una patente (registro de admin; lo no registrado = externo).
+ *  PIN incorrecto/faltante en una patente que SÍ tiene PIN cae al mismo camino que una
+ *  patente no registrada — nunca revela que esa patente es remis/socio a quien no tiene
+ *  el PIN correcto. */
 export function categoryAndPriceOf(
-  vehicle: { category: 'remis' | 'socio'; enabled: boolean } | null,
+  vehicle: { category: 'remis' | 'socio'; enabled: boolean; pin: string | null } | null,
   machine: { priceRemisArs: number; priceSocioArs: number; priceExternoArs: number },
+  providedPin?: string,
 ): { category: PlateCategory; priceArs: number } {
-  if (vehicle && vehicle.enabled && vehicle.category === 'remis') {
+  const eligible = vehicle && vehicle.enabled && pinOk(vehicle, providedPin);
+  if (eligible && vehicle.category === 'remis') {
     return { category: 'remis', priceArs: machine.priceRemisArs };
   }
-  if (vehicle && vehicle.enabled && vehicle.category === 'socio') {
+  if (eligible && vehicle.category === 'socio') {
     return { category: 'socio', priceArs: machine.priceSocioArs };
   }
   return { category: 'externo', priceArs: machine.priceExternoArs };
 }
 
 /** Cotización SIN cobrar: el usuario ve su tarifa antes de pagar. */
-export async function quotePlate(deps: MachineDeps, machineId: string, plate: string): Promise<PlateQuote> {
+export async function quotePlate(
+  deps: MachineDeps,
+  machineId: string,
+  plate: string,
+  pin?: string,
+): Promise<PlateQuote> {
   const machine = await getMachine(deps.db, machineId);
   if (!machine) throw new AppError('MACHINE_NOT_FOUND', `Máquina no encontrada: ${machineId}`);
   if (!machine.enabled || machine.status === 'DISABLED') {
     throw new AppError('MACHINE_DISABLED', 'La máquina está deshabilitada por administración.');
   }
   const vehicle = await getVehicleByPlate(deps.db, plate);
-  const { category, priceArs } = categoryAndPriceOf(vehicle, machine);
+  const { category, priceArs } = categoryAndPriceOf(vehicle, machine, pin);
   const limit = await getDailyWashLimit(deps.db, deps.config);
   const today = new Date();
   today.setHours(0, 0, 0, 0);

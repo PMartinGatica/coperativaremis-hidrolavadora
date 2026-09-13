@@ -56,6 +56,7 @@ export default function MachinePage() {
   const plateKey = `hidro.plate.${machineId}`;
   const [sessionId, setSessionId] = useState<string | null>(() => searchParams.get('session') ?? localStorage.getItem(sessionKey));
   const [plate, setPlate] = useState<string>(() => localStorage.getItem(plateKey) ?? '');
+  const [pin, setPin] = useState('');
   const [quote, setQuote] = useState<PlateQuote | null>(null);
   const [quoting, setQuoting] = useState(false);
   const [quoteError, setQuoteError] = useState<string | null>(null);
@@ -116,7 +117,7 @@ export default function MachinePage() {
     try {
       const r = await api<{ quote: PlateQuote }>(`/public/machines/${machineId}/quote`, {
         method: 'POST',
-        body: { plate },
+        body: { plate, pin: pin || undefined },
       });
       setQuote(r.quote);
       localStorage.setItem(plateKey, r.quote.plate);
@@ -139,7 +140,8 @@ export default function MachinePage() {
     try {
       const r = await api<{ checkout: CheckoutResponse }>(`/public/machines/${machineId}/sessions`, {
         method: 'POST',
-        body: { plate: quote.plate },
+        // Mismo pin que se usó en la cotización: lo que se vio es lo que se cobra.
+        body: { plate: quote.plate, pin: pin || undefined },
       });
       localStorage.setItem(sessionKey, r.checkout.sessionId);
       setSessionId(r.checkout.sessionId);
@@ -169,6 +171,7 @@ export default function MachinePage() {
     setError(null);
     setQuote(null);
     setQuoteError(null);
+    setPin('');
     navigate(`/machine/${machineId}`, { replace: true });
   }
 
@@ -241,6 +244,8 @@ export default function MachinePage() {
             starting={starting}
             plate={plate}
             setPlate={setPlate}
+            pin={pin}
+            setPin={setPin}
             quote={quote}
             quoting={quoting}
             quoteError={quoteError}
@@ -275,6 +280,8 @@ interface FlowStageProps {
   starting: boolean;
   plate: string;
   setPlate: (v: string) => void;
+  pin: string;
+  setPin: (v: string) => void;
   quote: PlateQuote | null;
   quoting: boolean;
   quoteError: string | null;
@@ -292,6 +299,8 @@ function FlowStage({
   starting,
   plate,
   setPlate,
+  pin,
+  setPin,
   quote,
   quoting,
   quoteError,
@@ -353,6 +362,24 @@ function FlowStage({
               />
             </div>
 
+            <div className="mt-3 text-left">
+              <label className="mb-1 block text-[0.62rem] uppercase tracking-[0.24em] text-faint">
+                PIN (solo socios y remis)
+              </label>
+              <input
+                className="input num text-center tracking-[0.3em]"
+                value={pin}
+                onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void onQuote();
+                }}
+                placeholder="Opcional"
+                inputMode="numeric"
+                maxLength={4}
+                autoComplete="off"
+              />
+            </div>
+
             {machine.demoMode ? (
               <div className="mt-2 text-[0.68rem] text-faint">
                 DEMO: probá con <span className="num text-aqua">AE100AA</span> (remis),{' '}
@@ -392,6 +419,9 @@ function FlowStage({
           </div>
           <h2 className="mt-3 font-display text-xl font-semibold tracking-wide">{quote.categoryLabel.toUpperCase()}</h2>
           <div className="num mt-2 text-5xl font-semibold text-aqua">{formatArs(quote.priceArs)}</div>
+          {quote.category === 'externo' ? (
+            <p className="mt-2 text-[0.68rem] text-faint">¿Sos socio o remisero? Verificá tu patente y PIN.</p>
+          ) : null}
           <div className="mt-2 text-xs text-dim">
             {limitReached ? (
               <span className="text-err">

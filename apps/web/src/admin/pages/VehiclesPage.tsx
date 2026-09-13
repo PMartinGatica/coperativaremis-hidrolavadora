@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Car, Plus, Trash2 } from 'lucide-react';
+import { Car, KeyRound, Plus, Trash2 } from 'lucide-react';
 import { api, ApiError } from '../../api/client.js';
 import { usePolling } from '../../lib/usePolling.js';
 import { formatDateTime } from '../../lib/format.js';
@@ -10,6 +10,7 @@ interface VehicleRow {
   plate: string;
   category: 'remis' | 'socio';
   ownerName: string | null;
+  hasPin: boolean;
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
@@ -22,6 +23,7 @@ export default function VehiclesPage() {
   const [plate, setPlate] = useState('');
   const [category, setCategory] = useState<'remis' | 'socio'>('remis');
   const [ownerName, setOwnerName] = useState('');
+  const [pin, setPin] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -43,9 +45,12 @@ export default function VehiclesPage() {
     setError(null);
     setSaved(false);
     try {
-      await api('/admin/vehicles', { method: 'POST', body: { plate, category, ownerName } });
+      // pin ausente (undefined) si el campo quedó vacío: no toca un PIN ya cargado en esa
+      // patente (tri-estado, ver docs/designs/pin-patente-remis-socio.md).
+      await api('/admin/vehicles', { method: 'POST', body: { plate, category, ownerName, pin: pin || undefined } });
       setPlate('');
       setOwnerName('');
+      setPin('');
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
@@ -57,6 +62,13 @@ export default function VehiclesPage() {
 
   async function remove(p: string) {
     await api(`/admin/vehicles/${p}`, { method: 'DELETE' });
+  }
+
+  async function removePin(v: VehicleRow) {
+    await api('/admin/vehicles', {
+      method: 'POST',
+      body: { plate: v.plate, category: v.category, ownerName: v.ownerName ?? undefined, pin: null },
+    });
   }
 
   return (
@@ -72,7 +84,7 @@ export default function VehiclesPage() {
       {/* alta / re-categorización */}
       <form onSubmit={save} className="card space-y-3 p-5">
         <div className="text-[0.68rem] uppercase tracking-[0.24em] text-faint">Registrar patente (o cambiar su categoría)</div>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-4">
           <div>
             <label className="mb-1 block text-[0.65rem] uppercase tracking-[0.2em] text-faint">Patente</label>
             <input
@@ -93,6 +105,17 @@ export default function VehiclesPage() {
           <div>
             <label className="mb-1 block text-[0.65rem] uppercase tracking-[0.2em] text-faint">Titular (opcional)</label>
             <input className="input" value={ownerName} onChange={(e) => setOwnerName(e.target.value)} placeholder="Nombre / interno" />
+          </div>
+          <div>
+            <label className="mb-1 block text-[0.65rem] uppercase tracking-[0.2em] text-faint">PIN (4 dígitos)</label>
+            <input
+              className="input num text-center tracking-[0.3em]"
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              placeholder="Sin cambios"
+              inputMode="numeric"
+              maxLength={4}
+            />
           </div>
         </div>
         {error ? <div className="text-sm text-err">{error}</div> : null}
@@ -124,6 +147,7 @@ export default function VehiclesPage() {
                 <th className="px-4 py-3">Categoría</th>
                 <th className="px-4 py-3">Tarifa</th>
                 <th className="px-4 py-3">Titular</th>
+                <th className="px-4 py-3">PIN</th>
                 <th className="px-4 py-3">Alta</th>
                 <th className="px-4 py-3"></th>
               </tr>
@@ -139,6 +163,19 @@ export default function VehiclesPage() {
                   </td>
                   <td className="num px-4 py-3">{v.category === 'remis' ? '$500' : '$2.000'}</td>
                   <td className="px-4 py-3 text-xs text-dim">{v.ownerName ?? '—'}</td>
+                  <td className="px-4 py-3">
+                    {v.hasPin ? (
+                      <button
+                        className="chip gap-1 text-ok border-ok/30 bg-ok/10"
+                        onClick={() => void removePin(v)}
+                        title="Quitar PIN de esta patente"
+                      >
+                        <KeyRound size={11} /> CONFIGURADO
+                      </button>
+                    ) : (
+                      <span className="text-xs text-faint">— sin PIN</span>
+                    )}
+                  </td>
                   <td className="num px-4 py-3 text-xs text-faint">{formatDateTime(v.createdAt)}</td>
                   <td className="px-4 py-3 text-right">
                     <button className="btn btn-danger h-8 w-8 rounded-lg" onClick={() => void remove(v.plate)} title="Eliminar registro (pasa a externo)">
@@ -155,6 +192,9 @@ export default function VehiclesPage() {
       <p className="text-[0.68rem] text-faint">
         Eliminar un registro hace que esa patente vuelva a cotizar como externo ($8.000). El límite de{' '}
         <b>2 lavados por día por patente</b> se aplica a todas las categorías (configurable en Ajustes).
+        Si una persona tiene 2 autos (su remis + su particular), cargá el <b>mismo PIN en las 2
+        patentes</b> — así el auto particular cobra tarifa de socio ($2.000) en vez de externo.
+        Sin PIN, la patente sigue funcionando como hasta ahora (sin exigirlo).
       </p>
     </div>
   );

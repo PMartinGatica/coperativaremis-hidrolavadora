@@ -348,6 +348,7 @@ export async function listAdminVehicles(deps: AdminDeps, search?: string) {
       plate: v.plate,
       category: v.category,
       ownerName: v.ownerName,
+      hasPin: v.pin != null,
       enabled: v.enabled,
       createdAt: v.createdAt.toISOString(),
       updatedAt: v.updatedAt.toISOString(),
@@ -356,26 +357,37 @@ export async function listAdminVehicles(deps: AdminDeps, search?: string) {
 
 export async function upsertAdminVehicle(
   deps: AdminDeps,
-  data: { plate: string; category: 'remis' | 'socio'; ownerName?: string },
+  data: {
+    plate: string;
+    category: 'remis' | 'socio';
+    ownerName?: string;
+    /** Tri-estado (ver upsertVehicle): undefined = no tocar, null = borrar, string = setear.
+     *  Acá llega en claro (validado por VehicleUpsertSchema) — se hashea recién acá, nunca
+     *  antes ni en el body de vuelta. */
+    pin?: string | null;
+  },
   actor: string,
 ) {
+  const pinHash = data.pin === undefined ? undefined : data.pin === null ? null : hashSecret(data.pin);
   const row = await upsertVehicle(deps.db, {
     plate: data.plate,
     category: data.category,
     ownerName: data.ownerName ?? null,
+    pinHash,
   });
   await insertAudit(deps.db, {
     actor,
     action: 'VEHICLE_UPDATED',
     entity: 'vehicle',
     entityId: row.id,
-    metadata: { plate: data.plate, category: data.category },
+    metadata: { plate: data.plate, category: data.category, pinChanged: pinHash !== undefined },
   });
   return {
     id: row.id,
     plate: row.plate,
     category: row.category,
     ownerName: row.ownerName,
+    hasPin: row.pin != null,
     enabled: row.enabled,
   };
 }

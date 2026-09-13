@@ -49,6 +49,9 @@ export function normalizePlate(raw: string): string {
 
 export const PLATE_REGEX = /^[A-Z0-9]{6,8}$/;
 
+/** PIN de 4 dígitos (remis/socio). Opcional: una patente particular no manda nada acá. */
+export const PIN_REGEX = /^\d{4}$/;
+
 export const PlateBodySchema = z.object({
   plate: z
     .string()
@@ -56,6 +59,13 @@ export const PlateBodySchema = z.object({
     .max(16)
     .transform((v) => normalizePlate(v))
     .refine((v) => PLATE_REGEX.test(v), { message: 'Patente inválida (ej: AE123CD).' }),
+  // El input del cliente puede mandar '' (campo vacío, no tocado) — se trata igual que
+  // "no mandó pin", no como un PIN inválido.
+  pin: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined))
+    .refine((v) => v === undefined || PIN_REGEX.test(v), { message: 'El PIN son 4 dígitos.' }),
 });
 
 export const QuoteParamsSchema = z.object({
@@ -95,6 +105,13 @@ export const VehicleUpsertSchema = z.object({
     .refine((v) => PLATE_REGEX.test(v), { message: 'Patente inválida (ej: AE123CD).' }),
   category: z.enum(['remis', 'socio']),
   ownerName: z.string().max(128).optional(),
+  // Tri-estado: AUSENTE (undefined) = no tocar el PIN existente; null = borrarlo
+  // explícitamente; string de 4 dígitos = setearlo. Nunca "" como valor válido.
+  pin: z
+    .string()
+    .regex(PIN_REGEX, 'El PIN son 4 dígitos.')
+    .nullable()
+    .optional(),
 });
 
 export const EmergencyStopSchema = z.object({

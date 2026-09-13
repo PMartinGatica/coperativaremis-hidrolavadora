@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { ZodError } from 'zod';
-import { AppError, httpStatusOf, isAppError } from '@hidro/shared';
+import { AppError, httpStatusOf, isAppError, normalizePlate } from '@hidro/shared';
 import type { Logger } from '../logger.js';
 
 /** Asigna un requestId correlacionable en todos los logs de la request. */
@@ -77,6 +77,27 @@ export function createPaymentCreationRateLimit() {
     standardHeaders: 'draft-8',
     legacyHeaders: false,
     message: { error: { code: 'RATE_LIMITED', message: 'Demasiados intentos de pago. Reintentá en un minuto.' } },
+  });
+}
+
+/** Por PATENTE (no por IP): un límite global por IP no frena a alguien que prueba los
+ *  10.000 PINs de 4 dígitos contra UNA patente conocida desde IPs distintas o rotando
+ *  (hallazgo del Eng review de docs/designs/pin-patente-remis-socio.md). Clave = patente
+ *  normalizada del body — el rate limiter corre ANTES del parseo Zod de la ruta, así que
+ *  normaliza acá mismo para que "ae123cd" y "AE123CD" compartan cupo. */
+export function createPinAttemptRateLimit() {
+  return rateLimit({
+    windowMs: 5 * 60 * 1000,
+    limit: 10,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    keyGenerator: (req) => {
+      const raw = typeof req.body?.plate === 'string' ? req.body.plate : '';
+      return `plate:${normalizePlate(raw)}`;
+    },
+    message: {
+      error: { code: 'RATE_LIMITED', message: 'Demasiados intentos para esta patente. Reintentá en unos minutos.' },
+    },
   });
 }
 

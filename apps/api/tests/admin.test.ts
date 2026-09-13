@@ -136,4 +136,123 @@ describe('panel administrativo', () => {
     expect(quote3.body.quote.category).toBe('externo');
     expect(quote3.body.quote.priceArs).toBe(8000);
   });
+
+  it('PIN por patente: grandfather sin PIN, exige PIN correcto una vez seteado, cotización y cobro coinciden', async () => {
+    t = await createTestApp();
+    const token = await adminToken(t);
+    await waitMachineStatus(t, 'HIDRO-01', 'ONLINE');
+
+    // sin PIN seteado: grandfather clause, sigue funcionando como antes
+    await t.api
+      .post('/api/admin/vehicles')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ plate: 'AE400AA', category: 'socio' })
+      .expect(200);
+    const noPinYet = await t.api.post('/api/public/machines/HIDRO-01/quote').send({ plate: 'AE400AA' }).expect(200);
+    expect(noPinYet.body.quote.category).toBe('socio');
+
+    // se le asigna un PIN
+    const upserted = await t.api
+      .post('/api/admin/vehicles')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ plate: 'AE400AA', category: 'socio', pin: '1234' })
+      .expect(200);
+    expect(upserted.body.vehicle.hasPin).toBe(true);
+
+    // sin PIN o PIN incorrecto -> cae a externo (mismo camino que no registrada, no filtra nada)
+    const missingPin = await t.api.post('/api/public/machines/HIDRO-01/quote').send({ plate: 'AE400AA' }).expect(200);
+    expect(missingPin.body.quote).toMatchObject({ category: 'externo', priceArs: 8000 });
+    const wrongPin = await t.api
+      .post('/api/public/machines/HIDRO-01/quote')
+      .send({ plate: 'AE400AA', pin: '0000' })
+      .expect(200);
+    expect(wrongPin.body.quote).toMatchObject({ category: 'externo', priceArs: 8000 });
+
+    // PIN correcto -> tarifa de socio
+    const rightPin = await t.api
+      .post('/api/public/machines/HIDRO-01/quote')
+      .send({ plate: 'AE400AA', pin: '1234' })
+      .expect(200);
+    expect(rightPin.body.quote).toMatchObject({ category: 'socio', priceArs: 2000 });
+
+    // cobro (creación de sesión) respeta la MISMA lógica que la cotización
+    const sessionWrongPin = await t.api
+      .post('/api/public/machines/HIDRO-01/sessions')
+      .send({ plate: 'AE400AA', pin: '9999' })
+      .expect(201);
+    expect(sessionWrongPin.body.checkout.plateCategory).toBe('externo');
+    expect(sessionWrongPin.body.checkout.payment.amount).toBe(8000);
+
+    // re-guardar SIN mandar pin no lo borra (tri-estado: ausente = no tocar)
+    await t.api
+      .post('/api/admin/vehicles')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ plate: 'AE400AA', category: 'socio' })
+      .expect(200);
+    const stillHasPin = await t.api
+      .post('/api/public/machines/HIDRO-01/quote')
+      .send({ plate: 'AE400AA', pin: '1234' })
+      .expect(200);
+    expect(stillHasPin.body.quote.category).toBe('socio');
+
+    // borrado explícito (pin: null) sí lo quita -> vuelve a la grandfather clause
+    const cleared = await t.api
+      .post('/api/admin/vehicles')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ plate: 'AE400AA', category: 'socio', pin: null })
+      .expect(200);
+    expect(cleared.body.vehicle.hasPin).toBe(false);
+    const noPinNeeded = await t.api.post('/api/public/machines/HIDRO-01/quote').send({ plate: 'AE400AA' }).expect(200);
+    expect(noPinNeeded.body.quote.category).toBe('socio');
+  });
+
+  it('PIN por patente: mismo PIN en 2 patentes de una persona (remis + particular)', async () => {
+    t = await createTestApp();
+    const token = await adminToken(t);
+    await waitMachineStatus(t, 'HIDRO-01', 'ONLINE');
+
+    await t.api
+      .post('/api/admin/vehicles')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ plate: 'AE500AA', category: 'remis', pin: '7777' })
+      .expect(200);
+    await t.api
+      .post('/api/admin/vehicles')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ plate: 'AE510AA', category: 'socio', pin: '7777' })
+      .expect(200);
+
+    const remisQuote = await t.api
+      .post('/api/public/machines/HIDRO-01/quote')
+      .send({ plate: 'AE500AA', pin: '7777' })
+      .expect(200);
+    expect(remisQuote.body.quote).toMatchObject({ category: 'remis', priceArs: 500 });
+
+    const socioQuote = await t.api
+      .post('/api/public/machines/HIDRO-01/quote')
+      .send({ plate: 'AE510AA', pin: '7777' })
+      .expect(200);
+    expect(socioQuote.body.quote).toMatchObject({ category: 'socio', priceArs: 2000 });
+  });
+
+  it('PIN por patente: rate limit por patente en /quote (no bloquea otras patentes)', async () => {
+    t = await createTestApp();
+    const token = await adminToken(t);
+    await waitMachineStatus(t, 'HIDRO-01', 'ONLINE');
+    await t.api
+      .post('/api/admin/vehicles')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ plate: 'AE600AA', category: 'socio', pin: '1111' })
+      .expect(200);
+
+    for (let i = 0; i < 10; i++) {
+      await t.api.post('/api/public/machines/HIDRO-01/quote').send({ plate: 'AE600AA', pin: '0000' }).expect(200);
+    }
+    const limited = await t.api.post('/api/public/machines/HIDRO-01/quote').send({ plate: 'AE600AA', pin: '1111' });
+    expect(limited.status).toBe(429);
+
+    // otra patente no comparte el cupo agotado
+    const otherPlate = await t.api.post('/api/public/machines/HIDRO-01/quote').send({ plate: 'AE601AA' }).expect(200);
+    expect(otherPlate.body.quote.category).toBe('externo');
+  });
 });

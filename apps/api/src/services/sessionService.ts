@@ -77,6 +77,7 @@ export async function createSessionWithPayment(
   deps: SessionDeps,
   machineId: string,
   plate: string,
+  pin?: string,
 ): Promise<CheckoutResponse> {
   const { db, provider } = deps;
 
@@ -94,7 +95,7 @@ export async function createSessionWithPayment(
     await assertMachinePayable({ ...deps, db: tx }, machineId);
 
     const vehicle = await getVehicleByPlate(tx, plate);
-    const priced = categoryAndPriceOf(vehicle, machine);
+    const priced = categoryAndPriceOf(vehicle, machine, pin);
     category = priced.category;
     amount = priced.priceArs;
 

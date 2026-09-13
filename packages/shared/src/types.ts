@@ -56,6 +56,8 @@ export interface VehicleRow {
   plate: string;
   category: 'remis' | 'socio';
   ownerName: string | null;
+  /** Hash del PIN (nunca en claro). NULL = sin PIN, grandfather clause. */
+  pin: string | null;
   enabled: boolean;
   createdAt: Date;
   updatedAt: Date;
