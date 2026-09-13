@@ -61,6 +61,20 @@
   Origen: `/autoplan` (voz CEO, subagente Claude) sobre
   `docs/designs/reconciliacion-pagos-ui.md`, 2026-09-07.
 
+- **[Operativo, tooling]** `meta/_journal.json` de drizzle-kit está desincronizado: las
+  migraciones 0000/0001 fueron escritas a mano sin generar sus snapshots, así que
+  `npm run db:generate -w @hidro/api` recrea TODO el schema desde cero en vez de un diff
+  incremental (confirmado al usarlo para esta feature — se descartó el archivo generado y
+  se escribió `0002_vehicle_pin.sql` a mano). No rompe producción (el runner propio,
+  `db/migrate.ts`, no lee esa metadata) pero cualquier futuro `db:generate` va a repetir
+  este problema hasta que alguien regenere la base de snapshots correctamente. Fuera del
+  blast radius de la feature del PIN. Origen: Build de ADR-036, 2026-09-13.
+
+- **[Backlog, UX]** Cupo diario combinado por persona: hoy cada patente de un socio tiene
+  su propio cupo de 2 lavados/día independiente (aunque comparta PIN con otra suya) — no
+  lo pidió el cliente explícitamente, y combinarlo cambiaría ADR-024. Revisar si surge
+  como pedido real. Origen: `docs/designs/pin-patente-remis-socio.md`, 2026-09-13.
+
 ## Resueltos
 
 (ninguno todavía)

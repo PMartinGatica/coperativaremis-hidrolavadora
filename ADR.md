@@ -566,3 +566,51 @@
   (`pendientes-manual.md` §4) — este trabajo deja el repo listo para que, cuando se haga,
   el mismo link ya muestre el producto completo. `docs/deploy-coolify.md` actualizado con
   esa nota y el chequeo visual post-deploy.
+
+- **2026-09-13 — ADR-036: PIN de 4 dígitos por patente (remis/socio), pedido en vivo por el
+  cliente (Gaby, cooperativa). Pipeline completo: `/office-hours` (premisas corregidas en
+  el medio — ver abajo) → `/autoplan` condensado (Eng, dual-voice) → Build → 84 tests
+  (incluye 3 nuevos específicos de PIN) + verificación en navegador real.**
+  Origen: hoy cualquiera que sepa una patente remis/socio ajena se cobra su tarifa
+  preferencial sin ninguna verificación. Diseño: `docs/designs/pin-patente-remis-socio.md`.
+  **Corrección de alcance real durante /office-hours:** mi primer modelo asumía "1 PIN por
+  patente"; el cliente aclaró que el PIN es DE LA PERSONA, que puede tener 2 autos (su
+  remis + su particular, que cobra tarifa de socio por serlo, no la de externo) — se
+  resuelve con el MISMO PIN cargado en las 2 filas de `vehicles`, sin entidad nueva
+  (descartada por desproporcionada a ~2-3 socios reales hoy). También se confirmó que
+  "cuántos lavados le quedan hoy" (otro pedido del cliente) **ya estaba construido**
+  (`MachinePage.tsx`, `quote.remainingToday`) — cero trabajo ahí.
+  **Diseño:** columna `pin` (hash scrypt vía `hashSecret`/`verifySecret` ya existentes,
+  reusa el mecanismo de la contraseña admin) en `vehicles`, nullable — grandfather clause:
+  sin PIN seteado, sigue funcionando como antes. `categoryAndPriceOf` (único choke point,
+  llamado por `quotePlate` y `createSessionWithPayment` dentro de la misma transacción con
+  lock advisory) resuelve PIN incorrecto/faltante al MISMO camino que patente no
+  registrada — nunca revela que una patente es remis/socio a quien no tiene el PIN.
+  **2 hallazgos reales del Eng review (subagente independiente, verificados por mí):** (1)
+  `VehicleUpsertSchema.pin` como `.optional()` rechazaba `null` con Zod, rompiendo el
+  borrado explícito de PIN que el propio plan pedía — corregido a `.nullable().optional()`
+  + tri-estado real en `upsertVehicle` (ausente = no tocar, `null` = borrar, string =
+  setear; distinto del `ownerName`, que sí se pisa siempre — perder un PIN en silencio es
+  un bug funcional, no cosmético). (2) `/quote` no tenía protección específica contra
+  fuerza bruta del PIN — el rate limit global (600/5min por IP) permitía agotar los 10.000
+  PINs contra una patente conocida en ~2.3h. Fix: `createPinAttemptRateLimit`
+  (`middleware.ts`), mismo `express-rate-limit` ya usado en todo el Mundo, con
+  `keyGenerator` sobre la patente normalizada (no la IP) — 10 intentos/5min por patente,
+  aplicado a `/quote` y `/sessions`. Side-channel de timing en `verifySecret` (scrypt solo
+  corre si hay PIN seteado): real pero de severidad baja para este modelo de amenaza
+  (lavadero de barrio), no se normaliza — aceptado explícitamente, no residual olvidado.
+  **Verificado en vivo (Edge headless, no solo tests):** patente con PIN + sin pin
+  ingresado → $8.000 con el aviso "¿Sos socio o remisero?" ✓; mismo patente + PIN correcto
+  → $2.000 (socio) ✓; alta de patente con PIN por el form admin → `hasPin: true`
+  confirmado por API real ✓; PIN nuevo funciona de inmediato en la cotización pública ✓.
+  87 tests de `apps/api` verdes (84 preexistentes + 3 nuevos: grandfather+verificación,
+  mismo PIN en 2 patentes, rate limit por patente sin afectar otras), `tsc` limpio en
+  api/web/shared.
+  **Nota operativa (no de esta feature, descubierta al tocar `db:generate`):**
+  `drizzle-kit generate` recrea TODO el schema desde cero en este repo — las migraciones
+  0000/0001 fueron escritas a mano sin generar sus snapshots, así que `meta/_journal.json`
+  no tiene una base real para diffear. El runner propio (`db/migrate.ts`) no usa esa
+  metadata (lee `.sql` de `drizzle/` directo, trackea aplicadas en `hidro_migrations`), así
+  que no rompe nada en producción — pero significa que `db:generate` seguirá generando
+  basura hasta que alguien regenere la base de snapshots correctamente. La migración de
+  esta feature (`0002_vehicle_pin.sql`) se escribió a mano, seguí esa convención.
