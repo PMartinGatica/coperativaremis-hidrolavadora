@@ -706,3 +706,24 @@
   **El volumen persistente queda validado en producción real** (no solo en el test local con
   Docker). Sigue el pipeline gstack (`/qa`, `/retro`) para cerrar la fase; en paralelo, Pablo
   continúa con A3 (chequear IP real detrás de Cloudflare) y el resto de `pendientes-manual.md`.
+- **2026-09-15 (ADR-041).** `/qa` contra `apps/api`+`apps/web` en local (Standard, decisión D1:
+  local en vez de producción — no había necesidad de tocar el deploy real para esto). Verificado
+  explícitamente el invariante #1 del Mundo contra el estado real del dispositivo simulado
+  (`GET /api/demo/device/:id/state`, no gateado por conectividad): con `internet_cut` disparado
+  justo después de presionar el pulsador, el relay se apaga y el timer llega a 0 sin depender de
+  que el backend se entere — se cumple. Hallazgo real (ISSUE-001, medium): `finishSession()`
+  grababa `finishedAt` con la hora en que el backend RECIBE el reporte del dispositivo (que puede
+  demorar si estuvo offline), no la hora real de corte del relay — duración de sesión inflada en
+  logs/auditoría tras una reconexión demorada. **Fix:** `finishedAt = min(startedAt +
+  session.durationSeconds, ahora)`, usando la duración que ya conoce el servidor. 100%
+  server-side: no toca el protocolo del dispositivo ni `firmware/`, así que no aplica la puerta
+  (a) reforzada del ADR-006 y el fix cubre igual al firmware real sin recompilar. Test de
+  regresión (`finish-timestamp.regression-1.test.ts`) confirmado en rojo contra el código viejo
+  (`git stash`) y en verde con el fix. Suite completa: 113/113 verdes. Commit local `9f8c6c8`,
+  **todavía sin pushear** — pendiente antes de que cuente en el próximo `/retro`. `/retro` (7d)
+  corrido: semana de 9 commits, test ratio 11% (↑5pp vs. semana anterior), sin deuda de
+  shortcuts, sin PRs (flujo directo a `main`). Storyline actualizado en
+  `redessociales-hidro-self-service.md` (capítulo "FASE-1 (continuación)"): botón de mesa de
+  entrada (ADR-034), PIN anti-abuso (ADR-036) y puesta en producción real (ADR-037/038/039/040)
+  contados como historia de usuario. Falta pushear el commit y que Pablo corra A4
+  (`pendientes-manual.md`) para dar la Fase 1 por cerrada del todo.

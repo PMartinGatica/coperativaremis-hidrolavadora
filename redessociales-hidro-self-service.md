@@ -120,6 +120,80 @@ segundo, la máquina igual se entera y se prende — nadie pierde esa plata.
 
 ---
 
+### FASE-1 (continuación) — De la demo a la máquina real  ·  actualizado 2026-09-15
+
+> Mismo capítulo (Fase 1), no uno nuevo: esto cierra los dos cabos sueltos que había dejado el
+> capítulo anterior ("falta el botón de mesa de entrada" y "falta ponerlo en producción de
+> verdad"). Falta un solo paso para dar la Fase 1 por cerrada del todo: que Pablo corra la
+> prueba final de "pago que se recupera solo" en su compu (A4 de `pendientes-manual.md`).
+
+**Qué se mostró en esta fase (1 línea):** la herramienta dejó de ser una demo — ahora corre con
+sus propias claves, mesa de entrada tiene botones para actuar sin usar la app de Mercado Pago, y
+nadie puede pagar la tarifa de otro escribiendo su patente.
+
+**Guión largo — capítulo de esta fase (para el video de 10–20 min):**
+- **Dónde quedamos / qué problema seguía abierto:** el capítulo anterior enseñó al sistema a no
+  perder pagos lentos. Pero quedaban tres cosas sin resolver: mesa de entrada todavía no tenía
+  pantalla propia para actuar sobre esos casos (se hacía "por detrás"), cualquiera podía escribir
+  la patente de un socio o de un remis para pagar $500 en vez de $8.000, y la página pública
+  todavía mostraba las claves de administrador escritas en pantalla — cualquiera que la abriera
+  podía entrar y cambiar tarifas.
+- **Qué se construyó en esta fase, contado como pasos en la herramienta:**
+  1. Mesa de entrada ahora tiene una pantalla propia: ve los pagos, y con dos botones puede
+     revisar de nuevo o cargar el comprobante real de Mercado Pago — sin tocar la app del
+     cliente ni adivinar.
+  2. Pagar la tarifa de socio o de remis ahora pide un PIN de 4 dígitos, además de la patente.
+     Sin el PIN correcto, se cobra la tarifa completa de particular. Ya no alcanza con conocer
+     una patente ajena.
+  3. La máquina dejó de tener claves de fábrica: cada credencial (la del panel de administración
+     y la que usa cada ESP32 para identificarse) es única y propia, generada una sola vez. La
+     página pública ya no muestra ninguna clave en pantalla.
+  4. Se probó a propósito: ¿qué pasa si a la máquina se le corta la señal justo cuando termina
+     un lavado? El motor se apaga solo, a tiempo, tenga o no señal — eso ya lo garantizaba el
+     diseño, y esta fase lo puso a prueba de verdad y lo confirmó. Lo único que se ajustó es que
+     el registro de "a qué hora terminó" ahora anota la hora real del corte, no la hora en que la
+     máquina recuperó señal para avisar — para que el historial cuente lo que pasó de verdad, no
+     lo que tardó en enterarse el sistema.
+  5. Se probó también en la máquina real (no en una compu de prueba): se borraron las patentes de
+     ensayo, se cargó una nueva, se reinició el sistema a propósito — y la patente nueva seguía
+     ahí. Nada se pierde con un reinicio.
+- **El momento "ajá":** alguien intenta pagar con la patente de otro socio para llevarse la
+  tarifa barata. El sistema le pide un PIN que no tiene. Tarifa completa. Fin del atajo.
+- **Cómo queda la herramienta al final de esta fase:** ya no es una demo con datos de prueba —
+  corre con sus propias claves, mesa de entrada puede actuar sin depender de nadie más, nadie
+  paga la tarifa de otro sin el PIN, y el corte del motor a tiempo quedó puesto a prueba contra
+  un corte de señal real, no solo prometido en el diseño.
+- **Puente a la próxima fase:** falta la última validación en la compu de Pablo (que un pago que
+  llega tarde se recupera solo, de punta a punta) para dar la Fase 1 por cerrada del todo. Y
+  después: la política de reembolso cuando el cliente paga y no llega a lavar, y la primera
+  prueba con el hardware real — motor, relay y contactor — con Pablo presente.
+
+**Short / Reel (30–45s, generado con `viral-youtube-shorts`):**
+- **Hook (primeros 3s):** "Probé pagar con la patente de mi vecino." (texto en pantalla sobre
+  alguien escribiendo una patente ajena en el celular)
+- **Desarrollo:** la pantalla muestra la tarifa de socio, $2.000 — pero al lado aparece "PIN
+  (solo socios y remis)". Corte: "sin el PIN, no hay descuento." Se ve el campo vacío y el botón
+  rechazando el pago con la tarifa completa de $8.000.
+- **Payoff:** el mismo intento, ahora con el PIN correcto — tarifa de socio, aprobado al toque.
+  El contraste (con PIN vs. sin PIN) es el gancho visual.
+- **Loop / cierre:** vuelve al plano inicial de alguien escribiendo una patente que no es la
+  suya, ahora con el texto "no funciona más" superpuesto — invita a mirar de nuevo el intento.
+- **CTA:** "video completo en el canal" + "si tu descuento se puede robar solo con un dato
+  público, escribime."
+
+**Caption de feed (Instagram/otros):**
+- **Gancho de apertura:** ¿Sabías la patente de un socio? Ya no te alcanza para su descuento.
+- **Cuerpo:** cualquier tarifa preferencial que dependa de un solo dato público (una patente, un
+  DNI, un código) se puede copiar. Le sumamos un PIN de 4 dígitos que solo tiene el dueño real —
+  y de paso, la herramienta dejó de correr con claves de fábrica: ahora es una máquina de
+  producción real, no una demo.
+- **Cierre + llamado a contacto:** si tu sistema de tarifas diferenciadas se puede engañar con un
+  dato que cualquiera puede conseguir, escribime y lo revisamos.
+- **Hashtags sugeridos:** #automatizacion #antifraude #cooperativa #ushuaia #sinfichas
+  #seguridadinformatica
+
+---
+
 ## Checklist de cierre de fase (para este archivo)
 
 - [ ] Cabecera del Mundo escrita/al día.
