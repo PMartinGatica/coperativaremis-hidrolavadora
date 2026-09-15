@@ -380,7 +380,7 @@ function FlowStage({
               />
             </div>
 
-            {machine.demoMode ? (
+            {import.meta.env.DEV && machine.demoMode ? (
               <div className="mt-2 text-[0.68rem] text-faint">
                 DEMO: probá con <span className="num text-aqua">AE100AA</span> (remis),{' '}
                 <span className="num text-aqua">AE200AA</span> (socio) o cualquier otra (externo).

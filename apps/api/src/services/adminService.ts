@@ -8,7 +8,7 @@ import {
   type SessionStatus,
 } from '@hidro/shared';
 import type { Db } from '../db/client.js';
-import type { AppConfig } from '../config.js';
+import { DEMO_ADMIN_PASSWORD, type AppConfig } from '../config.js';
 import type { Logger } from '../logger.js';
 import type { PaymentProvider } from '../payments/provider.js';
 import { adminUsers, payments, sessions as sessionsTable } from '../db/schema.js';
@@ -67,6 +67,16 @@ export function verifyToken(config: AppConfig, token: string): AdminUser | null 
 }
 
 export async function login(deps: AdminDeps, email: string, password: string) {
+  // Cubre cualquier fila guardada con la clave demo, aunque ADMIN_PASSWORD ya sea otra.
+  if (deps.config.nodeEnv === 'production' && password === DEMO_ADMIN_PASSWORD) {
+    await insertAudit(deps.db, {
+      actor: email,
+      action: 'ADMIN_LOGIN_FAILED',
+      entity: 'admin',
+      metadata: { reason: 'demo_password_blocked' },
+    });
+    throw new AppError('UNAUTHORIZED', 'Credenciales inválidas.');
+  }
   const rows = await deps.db.select().from(adminUsers).where(eq(adminUsers.email, email.toLowerCase().trim())).limit(1);
   const user = rows[0];
   if (!user || !verifySecret(password, user.passwordHash)) {

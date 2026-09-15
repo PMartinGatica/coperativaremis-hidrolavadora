@@ -23,6 +23,7 @@
     "test:e2e": "npm run test:e2e -w @hidro/api",
     "verify": "node scripts/verify-e2e.mjs",
     "check:firmware": "node scripts/check-firmware.mjs",
+    "check:bundle": "node scripts/check-bundle.mjs",
     "build:firmware": "pio run -d firmware/esp32"
   }
 }

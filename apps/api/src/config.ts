@@ -10,6 +10,13 @@ import {
 
 export type NodeEnv = 'development' | 'test' | 'production';
 
+const NODE_ENVS: readonly string[] = ['development', 'test', 'production'];
+
+export const DEV_SECRET_PLACEHOLDER = 'dev-only-change-me';
+export const DEMO_ADMIN_PASSWORD = 'hidro-demo-2025';
+const MIN_SECRET_LENGTH = 32;
+const MIN_ADMIN_PASSWORD_LENGTH = 12;
+
 export interface SeedOverrides {
   /** machineId -> secret de dispositivo (tests usan secrets conocidos) */
   deviceSecrets?: Record<string, string>;
@@ -71,6 +78,27 @@ function bool(value: string | undefined, fallback: boolean): boolean {
   return value.toLowerCase() === 'true';
 }
 
+// Un solo error con todos los problemas: se corrigen en un redeploy. Nombra variables, nunca valores.
+export function assertProductionConfig(config: AppConfig): void {
+  const problems: string[] = [];
+  const isWeakSecret = (v: string) => v === DEV_SECRET_PLACEHOLDER || v.length < MIN_SECRET_LENGTH;
+  if (isWeakSecret(config.jwtSecret)) {
+    problems.push(`JWT_SECRET falta, es el valor de desarrollo o tiene menos de ${MIN_SECRET_LENGTH} caracteres`);
+  }
+  if (isWeakSecret(config.deviceAuthSecret)) {
+    problems.push(
+      `DEVICE_AUTH_SECRET falta, es el valor de desarrollo o tiene menos de ${MIN_SECRET_LENGTH} caracteres`,
+    );
+  }
+  const adminPassword = config.seedOverrides.adminPassword ?? config.adminPassword;
+  if (adminPassword === DEMO_ADMIN_PASSWORD || adminPassword.length < MIN_ADMIN_PASSWORD_LENGTH) {
+    problems.push(`ADMIN_PASSWORD es la clave demo o tiene menos de ${MIN_ADMIN_PASSWORD_LENGTH} caracteres`);
+  }
+  if (problems.length > 0) {
+    throw new Error(`Configuración de producción inválida:\n- ${problems.join('\n- ')}`);
+  }
+}
+
 export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   // Carga apps/api/.env si existe (no falla si no existe)
   try {
@@ -79,7 +107,12 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     /* sin .env: se usan defaults DEMO */
   }
 
-  const nodeEnv = (str(process.env.NODE_ENV, 'development') as NodeEnv) ?? 'development';
+  const rawNodeEnv = str(process.env.NODE_ENV, 'development');
+  if (!NODE_ENVS.includes(rawNodeEnv)) {
+    // Un typo (ej. "prod") apagaría en silencio todas las guardas de producción.
+    throw new Error(`NODE_ENV inválido ("${rawNodeEnv}"): usar development, test o production.`);
+  }
+  const nodeEnv = rawNodeEnv as NodeEnv;
   const isProd = nodeEnv === 'production';
 
   const paymentProvider = str(process.env.PAYMENT_PROVIDER, 'demo') as 'demo' | 'mercadopago';
@@ -94,9 +127,6 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   }
 
   const jwtSecret = str(process.env.JWT_SECRET, '');
-  if (isProd && jwtSecret === 'dev-only-change-me') {
-    throw new Error('En producción JWT_SECRET es obligatorio y no puede ser el valor de desarrollo.');
-  }
 
   const dataDir = path.resolve(process.cwd(), str(process.env.DATA_DIR, './.data'));
   let speed = num(process.env.TEST_SPEED_FACTOR, 10);
@@ -119,11 +149,11 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     mercadopagoAccessToken: mpToken,
     mercadopagoPublicKey: mpPublic,
     mercadopagoWebhookSecret: mpWebhook,
-    jwtSecret: str(jwtSecret, 'dev-only-change-me'),
-    deviceAuthSecret: str(process.env.DEVICE_AUTH_SECRET, 'dev-only-change-me'),
+    jwtSecret: str(jwtSecret, DEV_SECRET_PLACEHOLDER),
+    deviceAuthSecret: str(process.env.DEVICE_AUTH_SECRET, DEV_SECRET_PLACEHOLDER),
     // Normalizado a minúsculas: el login compara lowercase (evita lockout por mayúsculas).
     adminEmail: str(process.env.ADMIN_EMAIL, 'admin@hidro.local').toLowerCase().trim(),
-    adminPassword: str(process.env.ADMIN_PASSWORD, 'hidro-demo-2025'),
+    adminPassword: str(process.env.ADMIN_PASSWORD, DEMO_ADMIN_PASSWORD),
     deviceSimulator: !isProd && bool(process.env.DEVICE_SIMULATOR, true),
     testSpeedFactor: speed,
     heartbeatIntervalMs: num(process.env.HEARTBEAT_INTERVAL_MS, DEFAULT_HEARTBEAT_INTERVAL_MS),
@@ -136,7 +166,8 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     ),
     dailyWashLimit: num(process.env.DAILY_WASH_LIMIT, DEFAULT_DAILY_WASH_LIMIT),
     trustProxy: num(process.env.TRUST_PROXY, isProd ? 1 : 0),
-    seedDemo: bool(process.env.SEED_DEMO, true),
+    // Solo las patentes demo dependen de esto; máquinas, dispositivos y admin se siembran siempre.
+    seedDemo: bool(process.env.SEED_DEMO, !isProd),
     seedOverrides: overrides.seedOverrides ?? {},
     corsOrigins: str(process.env.CORS_ORIGINS, 'http://localhost:5173')
       .split(',')
@@ -144,5 +175,7 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
       .filter(Boolean),
     logLevel: str(process.env.LOG_LEVEL, 'info') as AppConfig['logLevel'],
   };
-  return { ...config, ...overrides };
+  const merged = { ...config, ...overrides };
+  if (merged.nodeEnv === 'production') assertProductionConfig(merged);
+  return merged;
 }

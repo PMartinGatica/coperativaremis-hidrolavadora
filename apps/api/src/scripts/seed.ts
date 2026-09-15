@@ -1,6 +1,6 @@
 /**
  * Seed manual idempotente: node dist/scripts/seed.js
- * (el boot de la API también ejecuta el seed cuando SEED_DEMO=true)
+ * (el boot de la API también lo ejecuta siempre; SEED_DEMO solo decide las patentes demo)
  */
 import { loadConfig } from '../config.js';
 import { createDb } from '../db/client.js';
@@ -14,7 +14,9 @@ async function main(): Promise<void> {
     await runMigrations(db);
     const result = await runSeed(db.db, config);
     // eslint-disable-next-line no-console
-    console.log('Seed OK. Machines: HIDRO-01 (enabled), HIDRO-02 (disabled).');
+    console.log(
+      `Seed OK. Machines: HIDRO-01 (enabled), HIDRO-02 (disabled). Patentes demo: ${config.seedDemo ? 'sí' : 'no'}.`,
+    );
     // eslint-disable-next-line no-console
     console.log('Device secrets (solo demo/dev):', result.devicesFile);
   } finally {

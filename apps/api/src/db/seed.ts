@@ -8,7 +8,7 @@ import {
   scryptSync,
   timingSafeEqual,
 } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import {
   DEFAULT_DURATION_SECONDS,
   DEFAULT_PRICE_EXTERNO_ARS,
@@ -146,7 +146,14 @@ export async function runSeed(db: Db, config: AppConfig): Promise<SeedResult> {
 
     // Dispositivo (ESP32) por máquina con secret propio — nunca una clave global.
     const deviceRows = await db.select().from(devices).where(eq(devices.machineId, spec.id)).limit(1);
-    if (deviceRows.length === 0) {
+    const existingDevice = deviceRows[0];
+    if (existingDevice && decryptSecret(existingDevice.secretEnc, config.deviceAuthSecret) === null) {
+      // Base cifrada con otro DEVICE_AUTH_SECRET: el ESP32 va a recibir DEVICE_UNAUTHORIZED.
+      log.warn('device secret no descifra con DEVICE_AUTH_SECRET actual; rotar desde admin', {
+        machineId: spec.id,
+      });
+    }
+    if (!existingDevice) {
       const secret =
         config.seedOverrides.deviceSecrets?.[spec.id] ?? newDeviceSecret();
       deviceSecrets[spec.id] = secret;
@@ -164,35 +171,60 @@ export async function runSeed(db: Db, config: AppConfig): Promise<SeedResult> {
   }
 
   // Patentes DEMO (idempotente): registradas como remis/socio; lo demás es externo.
-  for (const v of DEMO_VEHICLES) {
-    const existing = await db.select().from(vehicles).where(eq(vehicles.plate, v.plate)).limit(1);
-    if (existing.length === 0) {
-      await db.insert(vehicles).values({
-        id: uuid(),
-        plate: v.plate,
-        category: v.category,
-        ownerName: v.ownerName,
-      });
-      log.info('vehicle seeded', { plate: v.plate, category: v.category });
+  if (config.seedDemo) {
+    if (config.nodeEnv === 'production') {
+      log.warn('SEED_DEMO activo en producción: se siembran patentes demo con tarifa remis/socio');
+    }
+    for (const v of DEMO_VEHICLES) {
+      const existing = await db.select().from(vehicles).where(eq(vehicles.plate, v.plate)).limit(1);
+      if (existing.length === 0) {
+        await db.insert(vehicles).values({
+          id: uuid(),
+          plate: v.plate,
+          category: v.category,
+          ownerName: v.ownerName,
+        });
+        log.info('vehicle seeded', { plate: v.plate, category: v.category });
+      }
     }
   }
 
-  // Usuario administrador DEMO (email SIEMPRE normalizado a minúsculas:
-  // el login compara lowercase, así que el seed no puede crear un email inlogueable)
+  // Email SIEMPRE normalizado a minúsculas: el login compara lowercase, así que el seed no
+  // puede crear un email inlogueable.
   const adminEmail = (config.seedOverrides.adminEmail ?? config.adminEmail).toLowerCase().trim();
+  const adminPassword = config.seedOverrides.adminPassword ?? config.adminPassword;
   const admins = await db
     .select()
     .from(adminUsers)
     .where(eq(adminUsers.email, adminEmail))
     .limit(1);
-  if (admins.length === 0) {
+  const admin = admins[0];
+  if (!admin) {
     await db.insert(adminUsers).values({
       id: uuid(),
       email: adminEmail,
-      passwordHash: hashSecret(config.seedOverrides.adminPassword ?? config.adminPassword),
+      passwordHash: hashSecret(adminPassword),
       role: 'admin',
     });
     log.info('admin user seeded', { email: adminEmail });
+  } else if (!verifySecret(adminPassword, admin.passwordHash)) {
+    // No hay pantalla de cambio de contraseña: el env es la única forma de rotarla.
+    await db
+      .update(adminUsers)
+      .set({ passwordHash: hashSecret(adminPassword) })
+      .where(eq(adminUsers.id, admin.id));
+    log.info('admin password synced from env', { email: adminEmail });
+  }
+
+  if (config.nodeEnv === 'production') {
+    // Una cuenta con email viejo sigue entrando y ya no cuenta como "la cuenta por defecto".
+    const others = await db
+      .select({ id: adminUsers.id })
+      .from(adminUsers)
+      .where(ne(adminUsers.email, adminEmail));
+    if (others.length > 0) {
+      log.warn('hay cuentas admin distintas de ADMIN_EMAIL', { count: others.length });
+    }
   }
 
   // Persiste los secrets de dispositivos en texto plano SOLO cuando corre el

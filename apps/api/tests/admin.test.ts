@@ -1,5 +1,16 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { createTestApp, adminToken, payAndAuthorize, waitSessionStatus, waitMachineStatus, type TestCtx } from './helpers.js';
+import { eq } from 'drizzle-orm';
+import { auditLogs } from '../src/db/schema.js';
+import { login } from '../src/services/adminService.js';
+import {
+  createTestApp,
+  adminToken,
+  payAndAuthorize,
+  waitSessionStatus,
+  waitMachineStatus,
+  DEVICE_SECRETS,
+  type TestCtx,
+} from './helpers.js';
 
 let t: TestCtx;
 
@@ -254,5 +265,30 @@ describe('panel administrativo', () => {
     // otra patente no comparte el cupo agotado
     const otherPlate = await t.api.post('/api/public/machines/HIDRO-01/quote').send({ plate: 'AE601AA' }).expect(200);
     expect(otherPlate.body.quote.category).toBe('externo');
+  });
+
+  it('en producción la clave demo no entra con ninguna cuenta, aunque esté guardada en la base', async () => {
+    t = await createTestApp({
+      adminPassword: 'hidro-demo-2025',
+      seedOverrides: { deviceSecrets: DEVICE_SECRETS, adminEmail: 'admin@test.local', adminPassword: 'hidro-demo-2025' },
+    });
+    await expect(login(t.ctx, 'admin@test.local', 'hidro-demo-2025')).resolves.toMatchObject({
+      email: 'admin@test.local',
+    });
+
+    const prodDeps = { ...t.ctx, config: { ...t.ctx.config, nodeEnv: 'production' as const } };
+    await expect(login(prodDeps, 'admin@test.local', 'hidro-demo-2025')).rejects.toMatchObject({
+      code: 'UNAUTHORIZED',
+    });
+    const failed = await t.ctx.db.select().from(auditLogs).where(eq(auditLogs.action, 'ADMIN_LOGIN_FAILED'));
+    expect(failed.map((row) => row.metadata)).toContainEqual({ reason: 'demo_password_blocked' });
+  });
+
+  it('en producción una clave normal sigue entrando (el bloqueo no deja afuera al admin real)', async () => {
+    t = await createTestApp();
+    const prodDeps = { ...t.ctx, config: { ...t.ctx.config, nodeEnv: 'production' as const } };
+    await expect(login(prodDeps, 'admin@test.local', 'admin-pass')).resolves.toMatchObject({
+      email: 'admin@test.local',
+    });
   });
 });

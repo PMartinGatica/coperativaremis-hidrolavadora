@@ -5,7 +5,7 @@ import { api, ApiError, storeToken } from '../api/client.js';
 
 export default function AdminLogin() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('admin@hidro.local');
+  const [email, setEmail] = useState(import.meta.env.DEV ? 'admin@hidro.local' : '');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -53,9 +53,11 @@ export default function AdminLogin() {
           <button className="btn btn-aqua w-full py-3 text-sm" disabled={busy}>
             <LogIn size={15} /> {busy ? 'VERIFICANDO…' : 'INGRESAR'}
           </button>
-          <div className="text-center text-[0.68rem] text-faint">
-            Credenciales DEMO: admin@hidro.local / hidro-demo-2025
-          </div>
+          {import.meta.env.DEV ? (
+            <div className="text-center text-[0.68rem] text-faint">
+              Credenciales DEMO: admin@hidro.local / hidro-demo-2025
+            </div>
+          ) : null}
         </form>
       </div>
     </div>

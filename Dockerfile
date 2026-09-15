@@ -10,7 +10,8 @@ COPY packages/shared/package.json packages/shared/package.json
 COPY packages/state-machine/package.json packages/state-machine/package.json
 RUN npm ci --ignore-scripts
 COPY . .
-RUN npm run build
+# check:bundle rompe la imagen si el build publica credenciales o patentes demo.
+RUN npm run build && npm run check:bundle
 # Podar devDependencies (typescript, vitest, drizzle-kit, supertest…) ANTES de
 # copiar a runtime: el árbol que viaja pesa ~120 MB en vez de ~500 MB.
 RUN npm prune --omit=dev --ignore-scripts && npm cache clean --force

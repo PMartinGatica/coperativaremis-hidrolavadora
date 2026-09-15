@@ -20,10 +20,10 @@ DATABASE_URL=postgres://hidro:CLAVE-SEGURA@host:5432/hidro
 NODE_ENV=production
 API_HOST=0.0.0.0                       # necesario dentro de contenedor
 TRUST_PROXY=1                          # detrás de reverse proxy (rate limit por IP real)
-JWT_SECRET=<aleatorio-largo>           # OBLIGATORIO en producción
-DEVICE_AUTH_SECRET=<aleatorio-largo>
-ADMIN_EMAIL=admin@hidro.local          # se normaliza a minúsculas
-ADMIN_PASSWORD=<clave-fuerte>
+JWT_SECRET=<64 hex>                    # OBLIGATORIO: sin él (o < 32 caracteres) no arranca
+DEVICE_AUTH_SECRET=<64 hex>            # OBLIGATORIO; no cambiarlo sobre una base existente
+ADMIN_EMAIL=<tu mail>                  # se normaliza a minúsculas
+ADMIN_PASSWORD=<12+ caracteres>        # la demo o < 12 caracteres: no arranca
 PAYMENT_PROVIDER=mercadopago
 MERCADOPAGO_ACCESS_TOKEN=...
 MERCADOPAGO_PUBLIC_KEY=...
@@ -32,8 +32,11 @@ PUBLIC_APP_URL=https://tu-dominio.com
 PUBLIC_API_URL=https://tu-dominio.com # webhooks de MP van a la API; si api en subdominio: https://api.tu-dominio.com
 DEVICE_SIMULATOR=false
 TEST_SPEED_FACTOR=1
-SEED_DEMO=true   # solo el primer arranque; luego false
+# SEED_DEMO no se carga: en producción las patentes demo quedan apagadas por defecto.
+# Máquinas, dispositivos y admin se crean siempre en una base vacía.
 ```
+
+Generar los secretos con `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
 
 ### 2) Build y ejecución (dos opciones)
 

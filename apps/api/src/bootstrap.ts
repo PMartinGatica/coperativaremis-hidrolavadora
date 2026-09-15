@@ -19,7 +19,7 @@ export async function createContext(overrides: Partial<AppConfig> = {}): Promise
   const dbHandle = await createDb(config);
   try {
     await runMigrations(dbHandle);
-    if (config.seedDemo) await runSeed(dbHandle.db, config);
+    await runSeed(dbHandle.db, config);
   } catch (err) {
     await dbHandle.close().catch(() => {});
     throw err;
