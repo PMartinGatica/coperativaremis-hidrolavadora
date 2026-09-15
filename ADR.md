@@ -614,3 +614,65 @@
   que no rompe nada en producción — pero significa que `db:generate` seguirá generando
   basura hasta que alguien regenere la base de snapshots correctamente. La migración de
   esta feature (`0002_vehicle_pin.sql`) se escribió a mano, seguí esa convención.
+
+- **2026-09-15 — `pendientes-manual.md` reescrito como checklist ejecutable, pedido explícito
+  de Pablo ("a prueba de boludos paso a paso").** Sin decisión técnica de fondo, pero deja
+  rastro porque corrige dos cosas que si no quedaban escritas se repetían solas: (1) el ítem
+  de ADR-007 (identidad de patente) seguía listado como pendiente cuando ya lo resolvió
+  ADR-036 (PIN) — se sacó de la lista. (2) `mensajes/mensaje-dueno.md` todavía traía la
+  pregunta 1 (la de la patente) ya respondida en vivo — se sacó y se renumeraron las 2
+  preguntas que quedan (reembolso, cuenta MP), incluida la referencia cruzada del agregado
+  del 2026-09-04 sobre el cupo diario. El checklist nuevo separa qué puede hacer Pablo ya
+  (Coolify, verificación de deploy, chequeo de `TRUST_PROXY`, correr la prueba de
+  recuperación de pago con los comandos `curl` ya armados) de lo que depende de terceros
+  (técnicos, dueño de la cooperativa) — mismo contenido de fondo, cero información nueva.
+
+- **2026-09-15 — ADR-037: la app de Coolify existía y estaba abierta; `SEED_DEMO=false` de la guía
+  de deploy era un error.** Pablo avisó que el link no daba 404 (el ADR-021/035 y `ESTADO.md` lo
+  daban por no creado). Chequeo externo: `/health` ok (`simulator: DISABLED`, `speedFactor: 1` —
+  el `ENV NODE_ENV=production` del `Dockerfile` cubre el ADR-025 aunque Coolify no lo cargue),
+  **pero `POST /api/admin/auth/login` con `admin@hidro.local`/`hidro-demo-2025` → 200** y la
+  patente demo `AE100AA` cotiza como remis a $500: el agujero del ADR-026, vivo en producción. Las
+  env de Coolify tenían solo `CORS_ORIGINS`, `PUBLIC_APP_URL` (vacía → QR de la máquina apunta a
+  `localhost:5173`, `adminService.ts:493`) y `PUBLIC_API_URL`; sin volumen persistente (cada
+  redeploy borra la base y los secrets de dispositivo). No se forjó ningún token ni se usó la
+  sesión admin obtenida: la verificación se limitó a status codes y endpoints públicos.
+  **Dos errores de código confirmados leyendo (no arreglados todavía, requieren pipeline):**
+  (1) `bootstrap.ts:22` saltea `runSeed` entero con `SEED_DEMO=false`, y `runSeed` crea máquinas,
+  dispositivos y admin además de las patentes demo — seguir la guía sobre una base vacía dejaba
+  el sistema sin máquina y sin cuenta. (2) `config.ts:96-97,122`: con `JWT_SECRET` ausente, la
+  guarda compara `'' === 'dev-only-change-me'` (false, pasa) y después `str('', default)` asigna
+  justo ese default — la guarda solo frena a quien tipea el literal. `DEVICE_AUTH_SECRET` ni
+  siquiera tiene guarda. **Mitigación inmediata (Pablo, en Coolify):** cargar `ADMIN_*`,
+  `JWT_SECRET`, `DEVICE_AUTH_SECRET`, `PUBLIC_APP_URL`, volumen en `/app/.data`, redeploy, y
+  neutralizar `AE100AA`/`AE200AA` con un PIN (borrarlas no sirve: el seed las recrea; con volumen,
+  el seed no pisa una fila existente). Dominio `http://` en Coolify se confirma correcto con el
+  túnel. **Fix de fondo pendiente (Fase 1.5, ADR-025/026):** separar seed base vs. demo y fallar
+  el arranque en producción con credenciales/secretos por defecto o ausentes.
+
+- **2026-09-15 — ADR-038: guardas de producción fail-closed + seed base/demo separado. Construido
+  con pipeline completo, commiteado solo en local hasta que Pablo haga A1 en Coolify.** Pipeline:
+  `/office-hours` (premisas D2, enfoque B D3, diseño D4, 2 rondas de spec review) → `/autoplan`
+  (CEO condensado, Eng con subagente independiente, 12 hallazgos, 10 aplicados) → Build.
+  Diseño: `docs/designs/guardas-produccion-seed.md`. Hallazgo extra de /office-hours: el bundle
+  publicado mostraba `Credenciales DEMO: admin@hidro.local / hidro-demo-2025` en `/admin`
+  (`AdminLogin.tsx:57`) y la patente demo en la página de la máquina.
+  **Qué cambia:** (1) `assertProductionConfig` sobre la config ya mezclada con overrides: en
+  producción no arranca con `JWT_SECRET`/`DEVICE_AUTH_SECRET` ausentes, placeholder o de menos
+  de 32 caracteres, ni con `ADMIN_PASSWORD` demo o de menos de 12; un solo error con la lista,
+  nunca valores. (2) `NODE_ENV` desconocido tira (un typo apagaba todas las guardas, familia
+  ADR-025). (3) `runSeed` corre siempre: máquinas, dispositivos y admin siempre; patentes demo
+  solo con `seedDemo`, cuyo default pasa a `!isProd`. (4) La clave del admin sembrado se
+  sincroniza desde `ADMIN_PASSWORD` en cada arranque (único camino de rotación: no hay UI).
+  (5) `login()` rechaza `hidro-demo-2025` en producción para cualquier cuenta, con auditoría
+  `demo_password_blocked`. (6) Warnings de arranque: `SEED_DEMO` activo en producción, device
+  secret que no descifra, cuentas admin distintas de `ADMIN_EMAIL`. (7) Web: textos demo solo
+  con `import.meta.env.DEV`. (8) `scripts/check-bundle.mjs` corre en el `Dockerfile`: si el build
+  contiene strings demo, la imagen no se construye.
+  **Decisiones de criterio:** commits locales en `main` sin push (no rama) hasta el rollout
+  paso 2, respetando la convención del repo; Healthcheck de Coolify queda apagado mientras la
+  base sea PGlite (rolling update = dos procesos sobre el volumen). Diferido a TODOS:
+  `onConflictDoNothing` en seed, UI de cambio de clave/baja de cuentas, healthcheck post-Postgres.
+  **Puerta (a):** 107 tests de `apps/api` verdes (87 previos + 20 nuevos), `tsc` limpio en api y
+  web, `npm run build && npm run check:bundle` verde, check negativo verificado (falla con un
+  string demo inyectado y sin `dist`). No toca `firmware/`.

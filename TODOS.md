@@ -75,6 +75,26 @@
   lo pidió el cliente explícitamente, y combinarlo cambiaría ADR-024. Revisar si surge
   como pedido real. Origen: `docs/designs/pin-patente-remis-socio.md`, 2026-09-13.
 
+- **[Hardening, al migrar a Postgres con más de una réplica]** `runSeed` hace "select y
+  después insert" (`seed.ts:131-143,148-161,183-196`): dos arranques simultáneos contra la
+  misma base chocan con los índices únicos y uno sale con error (se recupera al reiniciar).
+  Usar `.onConflictDoNothing()`. Hoy es imposible: un solo contenedor con PGlite. Origen:
+  `/autoplan` (voz eng, subagente) sobre `docs/designs/guardas-produccion-seed.md`,
+  2026-09-15.
+
+- **[Backlog, seguridad]** Pantalla para cambiar la contraseña y dar de baja cuentas admin.
+  Hoy la única forma de rotar la clave es `ADMIN_PASSWORD` + Redeploy (sync del seed), y una
+  cuenta con email viejo (si cambia `ADMIN_EMAIL`) queda viva con permiso de reconciliar sin
+  forma de borrarla desde la UI; solo hay un warning con el conteo al arrancar. Va junto con
+  la ruta de cuentas individuales de mesa de entrada (`pendientes-manual.md` C1). Origen:
+  `/autoplan` sobre `docs/designs/guardas-produccion-seed.md`, 2026-09-15.
+
+- **[Operativo, al migrar a Postgres]** Activar Healthcheck en Coolify (`/health`, puerto
+  3020) recién cuando la base deje de ser PGlite embebido: con healthcheck Coolify puede
+  levantar el contenedor nuevo antes de bajar el viejo, y dos procesos PGlite sobre el mismo
+  volumen arriesgan corromper la base. Origen: `/autoplan` (voz eng) sobre
+  `docs/designs/guardas-produccion-seed.md`, 2026-09-15.
+
 ## Resueltos
 
 (ninguno todavía)
