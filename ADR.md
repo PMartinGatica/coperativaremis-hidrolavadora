@@ -746,4 +746,21 @@
   server-side, diferido a TODOS:** un JSON mal formado en `/api/admin/auth/login` (y
   presumiblemente cualquier endpoint con body) no lo agarra ningún handler dedicado — cae al
   error genérico y responde `500` en vez de `400`. No es de seguridad, pero esconde la causa real;
-  merece su propio pase de `/autoplan` en vez de un parche ad-hoc acá.
+  merece su propio pase de `/autoplan` en vez de un parche ad-hoc acá. Pablo corrió A4 en vivo:
+  resultado `WAITING_FOR_BUTTON` (no `AUTHORIZED` — pasan una detrás de la otra en segundos, la
+  máquina simulada ya había armado la sesión al momento de consultar; corregido el criterio de
+  éxito en el archivo para aceptar ambos estados, matching `qa/FASE-1-manual.md:71`, que ya
+  documentaba esta ambigüedad desde el 2026-09-07).
+- **2026-09-15 (ADR-043, corrige una afirmación apresurada de ADR-042).** Dije que A4 cerraba la
+  Fase 1 "del todo" — no es así, y lo corrijo acá. A4 (ahora `qa/FASE-1-manual.md` filas 1-5) es
+  el mecanismo central, pero la puerta (b) formal de FASE-1.md pide más: fila 6 (reintentar sobre
+  una sesión ya recuperada → no debe autorizar dos veces), los 4 casos borde (sin pago aprobado,
+  `session_id_mismatch`, máquina ocupada, cuenta por defecto bloqueada) y, sobre todo, las 4 filas
+  que faltan de "Probar desde la UI" (reconciliar de verdad desde `/admin/sessions` con una cuenta
+  NO-default — hoy solo está probado que el botón existe y que la cuenta de fábrica lo tiene
+  bloqueado, no el camino de éxito real desde el panel). Corregido `pendientes-manual.md` (ya no
+  dice "cerrada del todo"; nuevo ítem A4b con lo que falta) y `qa/FASE-1-manual.md` (filas 1-5
+  marcadas ☑ con lo que Pablo efectivamente corrió). El veredicto final de esa guía sigue sin
+  marcar. Aprendizaje para la próxima vez: verificar contra la guía formal del gate (`FASE-N.md` +
+  `qa/FASE-N-manual.md`) antes de declarar una fase cerrada, no confiar en el resumen de un
+  checklist secundario (`pendientes-manual.md`) que puede estar desactualizado respecto al gate.

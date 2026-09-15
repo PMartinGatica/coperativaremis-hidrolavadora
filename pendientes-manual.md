@@ -6,16 +6,15 @@
 > de acá (si generó una decisión, queda su rastro en `ADR.md`).
 >
 > Última actualización: 2026-09-15 (noche). **A1, A2 y A2b hechos.** El arreglo de seguridad
-> (ADR-038) está en producción, verificado desde afuera, y el volumen persistente quedó
-> confirmado con una patente de prueba real (borrar demo → crear → Redeploy → sigue ahí).
-> **Lo que sigue es A3.** ⚠️ Coolify despliega solo cada vez que se sube código a `main`
-> (tarda ~2 minutos). El ítem de ADR-007 (patente) se sacó: lo resolvió el PIN (ADR-036).
-> `mensajes/mensaje-dueno.md` ya tiene 2 preguntas, no 3. **A4 reescrito con Pablo probándolo en
-> vivo:** el paso de `ADMIN_EMAIL` no hacía falta (sacado); los comandos pasaron de `curl.exe` a
-> `Invoke-RestMethod` porque PowerShell 5.1 le comía las comillas al JSON y tiraba un 500 sin
-> explicación (probado y confirmado con evidencia, no es una corazonada); se sumó un paso de
-> reset de datos DEMO al principio para que la prueba siempre arranque de cero. Los 5 pasos de
-> "La prueba en sí" quedaron verificados de punta a punta antes de pasárselos a Pablo.
+> (ADR-038) está en producción, verificado desde afuera, con volumen persistente confirmado
+> real. **A4 corrida y con éxito (ADR-042), pero OJO — corrijo algo que dije mal:** A4 valida
+> el mecanismo central (el pago que se recupera solo), no toda la puerta (b) de la Fase 1. La
+> guía formal (`qa/FASE-1-manual.md`) tiene más casos — sobre todo probar la reconciliación
+> **desde el panel de admin**, con una cuenta que no sea la de fábrica — que A4 no cubre. No
+> digo más "Fase 1 cerrada del todo" hasta que eso también esté hecho; ver el nuevo ítem A4b
+> abajo con lo que falta en limpio. **Lo que sigue: A3, y después A4b.** ⚠️ Coolify despliega
+> solo cada vez que se sube código a `main` (tarda ~2 minutos). El ítem de ADR-007 (patente) se
+> sacó: lo resolvió el PIN (ADR-036). `mensajes/mensaje-dueno.md` ya tiene 2 preguntas, no 3.
 
 ---
 
@@ -130,71 +129,72 @@ clientes bajo una sola cuota y el primero que pague deja a los demás sin poder.
    - Si NO coinciden → avisame, hay que ajustar `TRUST_PROXY` (o cambiar a leer el header
      `CF-Connecting-IP`, que Cloudflare no deja falsificar).
 
-### A4. Correr la prueba de "pago que se recupera solo" (cierra la Fase 1 oficialmente)
+### ✅ A4. Prueba de "pago que se recupera solo" — HECHO
 
-Esto es la única validación que falta para dar la Fase 1 por cerrada del todo. Se hace **en tu
-compu, local**, no en producción. Son ~15 minutos. Comandos ya armados, copiá y pegá en orden.
+**Corrida por vos el 2026-09-15, resultado `WAITING_FOR_BUTTON`** (sessionId `HS-QG956K`) — éxito:
+el pago tardío se recuperó solo, sin que nadie hiciera nada a mano, y encima confirmó que la
+máquina simulada se enteró y quedó armada. Esto valida el mecanismo central de la Fase 1.
 
-> ⚠️ **Windows/PowerShell — usá los comandos tal cual están, no los cambies a `curl`.**
-> PowerShell 5.1 (el que viene con Windows) tiene un bug conocido: cuando le pasás a un programa
-> externo un texto con comillas adentro de comillas (como el JSON de estos pedidos), a veces se
-> come las comillas de adentro y manda el pedido roto — el servidor no lo puede leer y tira un
-> error genérico ("Error interno del servidor") que no tiene nada que ver con lo que estás
-> probando. Por eso esta guía usa `Invoke-RestMethod` (el comando nativo de PowerShell) en vez de
-> `curl`: no tiene ese problema, y además se acuerda solo del token y del ID de sesión — no hay
-> que copiar y pegar nada a mano entre pasos, siempre que sea la misma ventana de PowerShell.
+**No es toda la puerta (b) de la Fase 1 — sigue en A4b más abajo.** La guía formal
+(`qa/FASE-1-manual.md`) también pide probar la reconciliación *desde el panel de admin* con una
+cuenta que no sea la de fábrica, y algunos casos borde. Dije antes que la Fase 1 quedaba "cerrada
+del todo" con esto — no es así, me apuré. Perdón por la confusión.
 
-**Preparación (una sola vez):**
-1. `npm run build` y después `npm run dev -w @hidro/api` (queda escuchando en
-   `http://localhost:3020`).
-2. Empezar de cero (borra sesiones/pagos de prueba viejos, no toca máquinas ni patentes ni tu
-   usuario admin — es un endpoint solo para desarrollo local):
-   ```powershell
-   Invoke-RestMethod -Uri "http://localhost:3020/api/demo/reset" -Method Post
-   ```
-3. Login (con el mail y clave de siempre) y guardar el token:
-   ```powershell
-   $login = Invoke-RestMethod -Uri "http://localhost:3020/api/admin/auth/login" -Method Post -ContentType "application/json" -Body (@{ email = "admin@hidro.local"; password = "hidro-demo-2025" } | ConvertTo-Json)
-   $token = $login.token
-   ```
-4. Bajá el tiempo de espera de un pago pendiente a 60 segundos (por defecto son 10 minutos,
-   mucho para probar):
-   ```powershell
-   Invoke-RestMethod -Uri "http://localhost:3020/api/admin/settings" -Method Patch -ContentType "application/json" -Headers @{ Authorization = "Bearer $token" } -Body (@{ paymentPendingTimeoutSeconds = 60 } | ConvertTo-Json)
-   ```
+<details><summary>Comandos usados (por si hay que repetirla alguna vez)</summary>
 
-**La prueba en sí:**
-1. Crear una sesión de lavado de prueba y guardar sus IDs:
-   ```powershell
-   $checkout = (Invoke-RestMethod -Uri "http://localhost:3020/api/public/machines/HIDRO-01/sessions" -Method Post -ContentType "application/json" -Body (@{ plate = "AE100AA" } | ConvertTo-Json)).checkout
-   $sessionId = $checkout.sessionId
-   $extPaymentId = $checkout.payment.externalPaymentId
-   Write-Output "sessionId=$sessionId  externalPaymentId=$extPaymentId"
-   ```
-2. **No hagas nada más.** Esperá ~70 segundos (más que los 60s que configuraste arriba).
-3. Consultá:
-   ```powershell
-   (Invoke-RestMethod -Uri "http://localhost:3020/api/public/sessions/$sessionId").session.status
-   ```
-   → tiene que decir `PAYMENT_EXPIRED` (el sistema la venció solo).
-4. Ahora simulá que Mercado Pago aprobó tarde (como si el aviso se hubiera perdido y llegara
-   después):
-   ```powershell
-   Invoke-RestMethod -Uri "http://localhost:3020/api/public/payments/$extPaymentId/simulate" -Method Post -ContentType "application/json" -Body (@{ action = "approve" } | ConvertTo-Json)
-   ```
-5. Consultá de nuevo la sesión (mismo comando del paso 3) → tiene que decir
-   `AUTHORIZED`. **Si dice eso, la prueba salió bien: el pago tardío se recuperó solo, sin que
-   nadie tuviera que hacer nada a mano.**
+> ⚠️ Windows/PowerShell: usá estos comandos tal cual, no los cambies a `curl`. PowerShell 5.1 (el
+> que trae Windows) le come las comillas a los argumentos con JSON adentro y manda el pedido roto
+> — confirmado con evidencia mientras depurábamos esto (ver ADR-042). `Invoke-RestMethod` no tiene
+> ese problema, y se acuerda solo del token/ID de sesión entre pasos (misma ventana de PowerShell).
 
-**✅ Si el paso 5 dio `AUTHORIZED`:** marcá acá abajo que la Fase 1 quedó validada:
-- [ ] Prueba de recuperación de pago corrida y con resultado `AUTHORIZED` en el paso 5.
+```powershell
+# Preparación (una sola vez)
+Invoke-RestMethod -Uri "http://localhost:3020/api/demo/reset" -Method Post
 
-Si en cualquier paso PowerShell te muestra un error rojo largo en vez de la respuesta esperada,
-copiámelo tal cual (todo el texto) junto con el número de paso — no lo resumas, el detalle es lo
-que permite diagnosticarlo.
+$login = Invoke-RestMethod -Uri "http://localhost:3020/api/admin/auth/login" -Method Post -ContentType "application/json" -Body (@{ email = "admin@hidro.local"; password = "hidro-demo-2025" } | ConvertTo-Json)
+$token = $login.token
 
-Si algo no coincide con lo esperado en cualquier paso, avisame con el número de paso y lo que
-viste en pantalla — no sigas adivinando.
+Invoke-RestMethod -Uri "http://localhost:3020/api/admin/settings" -Method Patch -ContentType "application/json" -Headers @{ Authorization = "Bearer $token" } -Body (@{ paymentPendingTimeoutSeconds = 60 } | ConvertTo-Json)
+
+# La prueba en sí
+$checkout = (Invoke-RestMethod -Uri "http://localhost:3020/api/public/machines/HIDRO-01/sessions" -Method Post -ContentType "application/json" -Body (@{ plate = "AE100AA" } | ConvertTo-Json)).checkout
+$sessionId = $checkout.sessionId
+$extPaymentId = $checkout.payment.externalPaymentId
+
+# Esperar ~70s sin tocar nada, después:
+(Invoke-RestMethod -Uri "http://localhost:3020/api/public/sessions/$sessionId").session.status
+# → PAYMENT_EXPIRED (el sistema la venció solo)
+
+Invoke-RestMethod -Uri "http://localhost:3020/api/public/payments/$extPaymentId/simulate" -Method Post -ContentType "application/json" -Body (@{ action = "approve" } | ConvertTo-Json)
+
+(Invoke-RestMethod -Uri "http://localhost:3020/api/public/sessions/$sessionId").session.status
+# → AUTHORIZED o WAITING_FOR_BUTTON (las dos son éxito)
+```
+
+</details>
+
+### 👉 A4b. Terminar la puerta (b) de la Fase 1: reconciliación desde el panel de admin
+
+Esto es lo que falta para que la Fase 1 cierre del todo. Es más largo que A4 — calculá 30-40
+minutos, y necesita el navegador (no solo la terminal). La guía completa, con cada caso y qué
+tiene que pasar, ya está escrita en `qa/FASE-1-manual.md` — pedime que te la vaya guiando paso a
+paso cuando quieras arrancar (usa el mismo truco del `.env`/`ADMIN_EMAIL` que sacamos de A4, pero
+ahí SÍ hace falta, porque esta vez estás probando la reconciliación de verdad).
+
+En criollo, lo que falta probar:
+- **Desde el panel** (`/admin/sessions`, no la terminal): que el botón "Reintentar automático"
+  funcione de verdad con una cuenta que no sea `admin@hidro.local` — hoy solo está probado que el
+  botón existe y que la cuenta de fábrica lo tiene bloqueado, falta el camino de éxito real.
+  También: que el mensaje "no hay pago" salga bien cuando corresponde, y que cargar un ID de pago
+  equivocado a mano dé el error correcto (no que autorice algo por error).
+  Casos con la cuenta NO-fábrica (los 4 que faltan de la guía).
+- **Un caso borde por terminal:** que si intentás reconciliar una sesión que YA se recuperó sola
+  (como la que probamos en A4), el sistema diga "no hace falta" en vez de generar una segunda
+  autorización por las dudas.
+- Marcar el veredicto final en `qa/FASE-1-manual.md` (al final del archivo) cuando esté todo OK.
+
+Si preferís dejarlo para otro día, avisame y seguimos con A3 mientras tanto — no hay apuro, nada
+de esto toca producción.
 
 ---
 

@@ -124,8 +124,9 @@ segundo, la máquina igual se entera y se prende — nadie pierde esa plata.
 
 > Mismo capítulo (Fase 1), no uno nuevo: esto cierra los dos cabos sueltos que había dejado el
 > capítulo anterior ("falta el botón de mesa de entrada" y "falta ponerlo en producción de
-> verdad"). Falta un solo paso para dar la Fase 1 por cerrada del todo: que Pablo corra la
-> prueba final de "pago que se recupera solo" en su compu (A4 de `pendientes-manual.md`).
+> verdad"). Pablo ya corrió la prueba central ("pago que se recupera solo", A4 de
+> `pendientes-manual.md`) y salió bien. Falta un paso más para dar la Fase 1 por cerrada del
+> todo: probar ese mismo botón de mesa de entrada desde la pantalla, con una cuenta propia (A4b).
 
 **Qué se mostró en esta fase (1 línea):** la herramienta dejó de ser una demo — ahora corre con
 sus propias claves, mesa de entrada tiene botones para actuar sin usar la app de Mercado Pago, y
@@ -163,10 +164,11 @@ nadie puede pagar la tarifa de otro escribiendo su patente.
   corre con sus propias claves, mesa de entrada puede actuar sin depender de nadie más, nadie
   paga la tarifa de otro sin el PIN, y el corte del motor a tiempo quedó puesto a prueba contra
   un corte de señal real, no solo prometido en el diseño.
-- **Puente a la próxima fase:** falta la última validación en la compu de Pablo (que un pago que
-  llega tarde se recupera solo, de punta a punta) para dar la Fase 1 por cerrada del todo. Y
-  después: la política de reembolso cuando el cliente paga y no llega a lavar, y la primera
-  prueba con el hardware real — motor, relay y contactor — con Pablo presente.
+- **Puente a la próxima fase:** la validación de "un pago que llega tarde se recupera solo" ya la
+  corrió Pablo y salió bien. Falta un último paso para dar la Fase 1 por cerrada del todo: probar
+  el mismo botón de mesa de entrada desde la pantalla, con su propia cuenta. Y después: la
+  política de reembolso cuando el cliente paga y no llega a lavar, y la primera prueba con el
+  hardware real — motor, relay y contactor — con Pablo presente.
 
 **Short / Reel (30–45s, generado con `viral-youtube-shorts`):**
 - **Hook (primeros 3s):** "Probé pagar con la patente de mi vecino." (texto en pantalla sobre
