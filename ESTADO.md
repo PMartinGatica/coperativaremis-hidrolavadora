@@ -1,22 +1,20 @@
 # ESTADO — MUNDO: HIDRO SELF-SERVICE
 
 > Handoff entre sesiones. Reescribir, no acumular. ≤40 líneas.
-> Última actualización: 2026-09-15 (noche) · detalle en `ADR.md` (014–041)
+> Última actualización: 2026-09-15 (noche) · detalle en `ADR.md` (014–042)
 
 ## Arranque de la próxima sesión
 1. Cargá SOLO este `ESTADO.md` + `CLAUDE.md` del Mundo. `export GSTACK_PROJECT_SLUG=
    PMartinGatica-hidro-self-service` antes de la primera skill de gstack.
-2. **`/qa` + `/retro` corridos (ADR-041).** `/qa` local confirmó el invariante #1 (timer local
-   sobrevive sin internet) contra el dispositivo real, y arregló ISSUE-001 (medium: `finishedAt`
-   usaba la hora de reconexión, no la de corte real), con test de regresión, 113/113 verdes.
-   `/retro` (7d): 9 commits, test ratio 11% (↑5pp), sin deuda de shortcuts. Storyline actualizado.
-3. **Ya pusheado y redesplegado.** El fix de ISSUE-001 (`9f8c6c8`) está en `main` y Coolify
-   redesplegó solo; verificado desde afuera: `/health` → 200 OK, `uptimeSeconds` bajo (proceso
-   nuevo), sin cambios en `payments`/`devices`/`speedFactor`. **Arrancar por acá:** nada de código
-   pendiente — seguir con el punto 4.
+2. **`/qa`+`/retro` cerraron el pipeline (ADR-041), fix ya en producción y verificado.** Sin
+   pendientes de código de esa parte.
+3. **A4 reescrito y verificado de punta a punta (ADR-042).** Pablo pegó los comandos de la guía
+   vieja y tiraban `500` — era PowerShell 5.1 comiéndose las comillas del JSON, no un bug de la
+   app. A4 ahora usa `Invoke-RestMethod`, probado en vivo end-to-end. **Arrancar por acá: esperar
+   que Pablo corra A4** con la guía nueva y confirme `AUTHORIZED` en el paso 5.
 4. **Pablo sigue con `pendientes-manual.md` desde A3** (chequear IP real detrás de Cloudflare) —
    A1, A2 y A2b ya están tachados. **A4 es lo único que falta para dar la Fase 1 por cerrada del
-   todo** (prueba de "pago que se recupera solo", en la compu de Pablo).
+   todo.**
 
 ## Dónde estamos
 Producción (`hidro-api.insolvadev.com`) corre con el fix de seguridad desplegado y validado

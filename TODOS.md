@@ -112,6 +112,15 @@
   `DEVICE_UNAUTHORIZED`. Mostrarlo en `/health` o en el panel. Origen: `/review` (adversarial)
   sobre ADR-038, 2026-09-15.
 
+- **[Robustez, manejo de errores]** Un body JSON mal formado en cualquier endpoint que lo espera
+  (probado en `/api/admin/auth/login`) no lo agarra ningún handler dedicado: cae al error genérico
+  y responde `500 {"code":"INTERNAL"}` en vez de un `400` claro tipo "JSON inválido". No es un
+  problema de seguridad (no hay fuga de datos), pero esconde la causa real ante cualquier cliente
+  que mande un body corrupto — en la práctica, encontrado porque PowerShell 5.1 le come las
+  comillas a los `-d` de `curl.exe` y el JSON llega roto (ver `pendientes-manual.md` A4). Fix
+  acotado: middleware de manejo de error para `express.json()` que convierta `SyntaxError` en un
+  `AppError` de validación. Origen: depurando A4 con Pablo, 2026-09-15.
+
 ## Resueltos
 
 (ninguno todavía)

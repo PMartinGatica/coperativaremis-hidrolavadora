@@ -10,9 +10,12 @@
 > confirmado con una patente de prueba real (borrar demo → crear → Redeploy → sigue ahí).
 > **Lo que sigue es A3.** ⚠️ Coolify despliega solo cada vez que se sube código a `main`
 > (tarda ~2 minutos). El ítem de ADR-007 (patente) se sacó: lo resolvió el PIN (ADR-036).
-> `mensajes/mensaje-dueno.md` ya tiene 2 preguntas, no 3. **A4 se simplificó:** el paso de cambiar
-> `ADMIN_EMAIL` en `.env` no hacía falta (esa regla es solo para aprobar pagos a mano, y A4 no
-> usa esa función) — sacado, ahora son 2 pasos de preparación en vez de 3.
+> `mensajes/mensaje-dueno.md` ya tiene 2 preguntas, no 3. **A4 reescrito con Pablo probándolo en
+> vivo:** el paso de `ADMIN_EMAIL` no hacía falta (sacado); los comandos pasaron de `curl.exe` a
+> `Invoke-RestMethod` porque PowerShell 5.1 le comía las comillas al JSON y tiraba un 500 sin
+> explicación (probado y confirmado con evidencia, no es una corazonada); se sumó un paso de
+> reset de datos DEMO al principio para que la prueba siempre arranque de cero. Los 5 pasos de
+> "La prueba en sí" quedaron verificados de punta a punta antes de pasárselos a Pablo.
 
 ---
 
@@ -132,45 +135,63 @@ clientes bajo una sola cuota y el primero que pague deja a los demás sin poder.
 Esto es la única validación que falta para dar la Fase 1 por cerrada del todo. Se hace **en tu
 compu, local**, no en producción. Son ~15 minutos. Comandos ya armados, copiá y pegá en orden.
 
-> ⚠️ **Windows/PowerShell:** usá `curl.exe` (con `.exe`), no `curl` a secas. En PowerShell
-> `curl` es un alias de `Invoke-WebRequest`, que no entiende `-H`/`-d` como el curl de verdad y
-> tira el error "No se puede enlazar el parámetro 'Headers'". `curl.exe` ya viene instalado en
-> Windows 10/11 (es el curl real) y los comandos de abajo funcionan tal cual, copiados y pegados.
+> ⚠️ **Windows/PowerShell — usá los comandos tal cual están, no los cambies a `curl`.**
+> PowerShell 5.1 (el que viene con Windows) tiene un bug conocido: cuando le pasás a un programa
+> externo un texto con comillas adentro de comillas (como el JSON de estos pedidos), a veces se
+> come las comillas de adentro y manda el pedido roto — el servidor no lo puede leer y tira un
+> error genérico ("Error interno del servidor") que no tiene nada que ver con lo que estás
+> probando. Por eso esta guía usa `Invoke-RestMethod` (el comando nativo de PowerShell) en vez de
+> `curl`: no tiene ese problema, y además se acuerda solo del token y del ID de sesión — no hay
+> que copiar y pegar nada a mano entre pasos, siempre que sea la misma ventana de PowerShell.
 
 **Preparación (una sola vez):**
 1. `npm run build` y después `npm run dev -w @hidro/api` (queda escuchando en
    `http://localhost:3020`).
-2. Login (con el mail y clave de siempre):
+2. Empezar de cero (borra sesiones/pagos de prueba viejos, no toca máquinas ni patentes ni tu
+   usuario admin — es un endpoint solo para desarrollo local):
+   ```powershell
+   Invoke-RestMethod -Uri "http://localhost:3020/api/demo/reset" -Method Post
    ```
-   curl.exe -s -X POST http://localhost:3020/api/admin/auth/login -H "Content-Type: application/json" -d "{\"email\":\"admin@hidro.local\",\"password\":\"hidro-demo-2025\"}"
+3. Login (con el mail y clave de siempre) y guardar el token:
+   ```powershell
+   $login = Invoke-RestMethod -Uri "http://localhost:3020/api/admin/auth/login" -Method Post -ContentType "application/json" -Body (@{ email = "admin@hidro.local"; password = "hidro-demo-2025" } | ConvertTo-Json)
+   $token = $login.token
    ```
-   Copiá el valor de `token` de la respuesta — lo vas a necesitar en el paso 3.
-3. Bajá el tiempo de espera de un pago pendiente a 60 segundos (por defecto son 10 minutos,
+4. Bajá el tiempo de espera de un pago pendiente a 60 segundos (por defecto son 10 minutos,
    mucho para probar):
-   ```
-   curl.exe -s -X PATCH http://localhost:3020/api/admin/settings -H "Authorization: Bearer TOKEN_DEL_PASO_2" -H "Content-Type: application/json" -d "{\"paymentPendingTimeoutSeconds\": 60}"
+   ```powershell
+   Invoke-RestMethod -Uri "http://localhost:3020/api/admin/settings" -Method Patch -ContentType "application/json" -Headers @{ Authorization = "Bearer $token" } -Body (@{ paymentPendingTimeoutSeconds = 60 } | ConvertTo-Json)
    ```
 
 **La prueba en sí:**
-1. Crear una sesión de lavado de prueba:
+1. Crear una sesión de lavado de prueba y guardar sus IDs:
+   ```powershell
+   $checkout = (Invoke-RestMethod -Uri "http://localhost:3020/api/public/machines/HIDRO-01/sessions" -Method Post -ContentType "application/json" -Body (@{ plate = "AE100AA" } | ConvertTo-Json)).checkout
+   $sessionId = $checkout.sessionId
+   $extPaymentId = $checkout.payment.externalPaymentId
+   Write-Output "sessionId=$sessionId  externalPaymentId=$extPaymentId"
    ```
-   curl.exe -s -X POST http://localhost:3020/api/public/machines/HIDRO-01/sessions -H "Content-Type: application/json" -d "{\"plate\":\"AE100AA\"}"
-   ```
-   Guardá `sessionId` y `payment.externalPaymentId` de la respuesta.
 2. **No hagas nada más.** Esperá ~70 segundos (más que los 60s que configuraste arriba).
-3. Consultá: `curl.exe -s http://localhost:3020/api/public/sessions/SESSION_ID` → tiene que decir
-   `"status":"PAYMENT_EXPIRED"` (el sistema la venció solo).
+3. Consultá:
+   ```powershell
+   (Invoke-RestMethod -Uri "http://localhost:3020/api/public/sessions/$sessionId").session.status
+   ```
+   → tiene que decir `PAYMENT_EXPIRED` (el sistema la venció solo).
 4. Ahora simulá que Mercado Pago aprobó tarde (como si el aviso se hubiera perdido y llegara
    después):
-   ```
-   curl.exe -s -X POST http://localhost:3020/api/public/payments/EXTERNAL_PAYMENT_ID/simulate -H "Content-Type: application/json" -d "{\"action\":\"approve\"}"
+   ```powershell
+   Invoke-RestMethod -Uri "http://localhost:3020/api/public/payments/$extPaymentId/simulate" -Method Post -ContentType "application/json" -Body (@{ action = "approve" } | ConvertTo-Json)
    ```
 5. Consultá de nuevo la sesión (mismo comando del paso 3) → tiene que decir
-   `"status":"AUTHORIZED"`. **Si dice eso, la prueba salió bien: el pago tardío se recuperó
-   solo, sin que nadie tuviera que hacer nada a mano.**
+   `AUTHORIZED`. **Si dice eso, la prueba salió bien: el pago tardío se recuperó solo, sin que
+   nadie tuviera que hacer nada a mano.**
 
 **✅ Si el paso 5 dio `AUTHORIZED`:** marcá acá abajo que la Fase 1 quedó validada:
 - [ ] Prueba de recuperación de pago corrida y con resultado `AUTHORIZED` en el paso 5.
+
+Si en cualquier paso PowerShell te muestra un error rojo largo en vez de la respuesta esperada,
+copiámelo tal cual (todo el texto) junto con el número de paso — no lo resumas, el detalle es lo
+que permite diagnosticarlo.
 
 Si algo no coincide con lo esperado en cualquier paso, avisame con el número de paso y lo que
 viste en pantalla — no sigas adivinando.

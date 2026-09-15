@@ -729,3 +729,21 @@
   afuera: `/health` → 200 OK (`{"status":"ok","database":"OK","payments":"DEMO","devices":"ONLINE
   0/2","speedFactor":1}`), sin cambios de comportamiento respecto del deploy anterior. Falta que
   Pablo corra A4 (`pendientes-manual.md`) para dar la Fase 1 por cerrada del todo.
+- **2026-09-15 (ADR-042).** A4 (`pendientes-manual.md`) reescrito tras depurar en vivo con Pablo:
+  su `curl.exe -d "{\"email\":...}"` tiraba `500 INTERNAL` sin explicación. Diagnóstico con
+  evidencia (no corazonada): el JSON válido pesa 58 bytes; el pedido real de su PowerShell medía
+  50 — exactamente los 8 caracteres `"` del JSON. Reconstruido el body sin comillas
+  (`{email:...,password:...}`) y mandado directo, reproduce el mismo 500. **Causa raíz: bug
+  conocido de PowerShell 5.1** (el que trae Windows) al pasarle a un ejecutable externo un
+  argumento con comillas anidadas — a veces las descarta, corrompiendo el JSON antes de que
+  `curl.exe` lo mande. No es specific a este endpoint ni a este Mundo. **Fix del lado cliente:**
+  A4 reescrito con `Invoke-RestMethod`/`ConvertTo-Json` (nativo de PowerShell, no pasa por
+  argv), que además encadena variables (`$token`, `$sessionId`) entre pasos sin copy-paste
+  manual — probado de punta a punta (creación de sesión → vencimiento real de 70s → aprobación
+  tardía → `AUTHORIZED`) antes de pasárselo a Pablo. Sumado un paso de `POST /api/demo/reset` al
+  inicio de A4 para que la prueba no dependa de qué patentes ya se usaron hoy en la base local
+  (la mía del `/qa` de esta sesión había dejado `AE100AA` en el tope del cupo diario). **Hallazgo
+  server-side, diferido a TODOS:** un JSON mal formado en `/api/admin/auth/login` (y
+  presumiblemente cualquier endpoint con body) no lo agarra ningún handler dedicado — cae al
+  error genérico y responde `500` en vez de `400`. No es de seguridad, pero esconde la causa real;
+  merece su propio pase de `/autoplan` en vez de un parche ad-hoc acá.
