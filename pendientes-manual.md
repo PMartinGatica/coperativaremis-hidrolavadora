@@ -132,33 +132,38 @@ clientes bajo una sola cuota y el primero que pague deja a los demás sin poder.
 Esto es la única validación que falta para dar la Fase 1 por cerrada del todo. Se hace **en tu
 compu, local**, no en producción. Son ~15 minutos. Comandos ya armados, copiá y pegá en orden.
 
+> ⚠️ **Windows/PowerShell:** usá `curl.exe` (con `.exe`), no `curl` a secas. En PowerShell
+> `curl` es un alias de `Invoke-WebRequest`, que no entiende `-H`/`-d` como el curl de verdad y
+> tira el error "No se puede enlazar el parámetro 'Headers'". `curl.exe` ya viene instalado en
+> Windows 10/11 (es el curl real) y los comandos de abajo funcionan tal cual, copiados y pegados.
+
 **Preparación (una sola vez):**
 1. `npm run build` y después `npm run dev -w @hidro/api` (queda escuchando en
    `http://localhost:3020`).
 2. Login (con el mail y clave de siempre):
    ```
-   curl -s -X POST http://localhost:3020/api/admin/auth/login -H "Content-Type: application/json" -d "{\"email\":\"admin@hidro.local\",\"password\":\"hidro-demo-2025\"}"
+   curl.exe -s -X POST http://localhost:3020/api/admin/auth/login -H "Content-Type: application/json" -d "{\"email\":\"admin@hidro.local\",\"password\":\"hidro-demo-2025\"}"
    ```
    Copiá el valor de `token` de la respuesta — lo vas a necesitar en el paso 3.
 3. Bajá el tiempo de espera de un pago pendiente a 60 segundos (por defecto son 10 minutos,
    mucho para probar):
    ```
-   curl -s -X PATCH http://localhost:3020/api/admin/settings -H "Authorization: Bearer TOKEN_DEL_PASO_2" -H "Content-Type: application/json" -d "{\"paymentPendingTimeoutSeconds\": 60}"
+   curl.exe -s -X PATCH http://localhost:3020/api/admin/settings -H "Authorization: Bearer TOKEN_DEL_PASO_2" -H "Content-Type: application/json" -d "{\"paymentPendingTimeoutSeconds\": 60}"
    ```
 
 **La prueba en sí:**
 1. Crear una sesión de lavado de prueba:
    ```
-   curl -s -X POST http://localhost:3020/api/public/machines/HIDRO-01/sessions -H "Content-Type: application/json" -d "{\"plate\":\"AE100AA\"}"
+   curl.exe -s -X POST http://localhost:3020/api/public/machines/HIDRO-01/sessions -H "Content-Type: application/json" -d "{\"plate\":\"AE100AA\"}"
    ```
    Guardá `sessionId` y `payment.externalPaymentId` de la respuesta.
 2. **No hagas nada más.** Esperá ~70 segundos (más que los 60s que configuraste arriba).
-3. Consultá: `curl -s http://localhost:3020/api/public/sessions/SESSION_ID` → tiene que decir
+3. Consultá: `curl.exe -s http://localhost:3020/api/public/sessions/SESSION_ID` → tiene que decir
    `"status":"PAYMENT_EXPIRED"` (el sistema la venció solo).
 4. Ahora simulá que Mercado Pago aprobó tarde (como si el aviso se hubiera perdido y llegara
    después):
    ```
-   curl -s -X POST http://localhost:3020/api/public/payments/EXTERNAL_PAYMENT_ID/simulate -H "Content-Type: application/json" -d "{\"action\":\"approve\"}"
+   curl.exe -s -X POST http://localhost:3020/api/public/payments/EXTERNAL_PAYMENT_ID/simulate -H "Content-Type: application/json" -d "{\"action\":\"approve\"}"
    ```
 5. Consultá de nuevo la sesión (mismo comando del paso 3) → tiene que decir
    `"status":"AUTHORIZED"`. **Si dice eso, la prueba salió bien: el pago tardío se recuperó
