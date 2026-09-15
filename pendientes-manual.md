@@ -5,24 +5,30 @@
 > hacer, cómo, y cómo saber que salió bien. Andá tachando. Cuando termines uno, avisame y lo saco
 > de acá (si generó una decisión, queda su rastro en `ADR.md`).
 >
-> Última actualización: 2026-09-15 (noche). **El arreglo de seguridad ya está construido y
-> probado en tu compu** (ADR-038: 107 tests, imagen Docker probada sin variables, con
-> variables y con volumen). **No está subido**: espera a que hagas A1, porque con el arreglo el
-> sistema no arranca sin tus claves y el sitio se caería. La app de Coolify YA existe y el link
-> anda. El ítem de ADR-007 (patente) se sacó: lo resolvió el PIN (ADR-036).
+> Última actualización: 2026-09-15 (noche). **A1, A2 y A2b hechos.** El arreglo de seguridad
+> (ADR-038) está en producción, verificado desde afuera, y el volumen persistente quedó
+> confirmado con una patente de prueba real (borrar demo → crear → Redeploy → sigue ahí).
+> **Lo que sigue es A3.** ⚠️ Coolify despliega solo cada vez que se sube código a `main`
+> (tarda ~2 minutos). El ítem de ADR-007 (patente) se sacó: lo resolvió el PIN (ADR-036).
 > `mensajes/mensaje-dueno.md` ya tiene 2 preguntas, no 3.
 
 ---
 
 ## PARTE A — Podés hacer esto ahora mismo, no depende de nadie más
 
-### A1. Corregir la configuración de Coolify (la app anda, pero está abierta)
+### ✅ A1. Corregir la configuración de Coolify — HECHO
 
-Chequeado desde afuera el 2026-09-15: `/health` responde bien y la página carga. Pero:
-- 🔴 **Cualquiera entra al panel admin con `admin@hidro.local` / `hidro-demo-2025`** (probado:
-  entra). Con eso puede cargar patentes como remis y lavar a $500, o cambiar tarifas.
-- 🔴 La patente demo `AE100AA` cobra $500 a quien la escriba.
-- 🔴 No hay volumen: cada redeploy borra patentes, PINs, pagos y la clave del ESP32.
+Confirmado por vos el 2026-09-15 y verificado desde afuera: redeploy hecho, clave admin de 12+
+caracteres, las 2 claves generadas con el comando de la guía, volumen Volume Mount. Ya no hace
+falta tocar nada de esto.
+
+<details><summary>Contexto (ya resuelto, para referencia)</summary>
+
+Chequeado desde afuera el 2026-09-15: `/health` respondía bien y la página cargaba. Pero:
+- 🔴 **Cualquiera entraba al panel admin con `admin@hidro.local` / `hidro-demo-2025`** (probado:
+  entraba). Con eso podía cargar patentes como remis y lavar a $500, o cambiar tarifas.
+- 🔴 La patente demo `AE100AA` cobraba $500 a quien la escribiera.
+- 🔴 No había volumen: cada redeploy borraba patentes, PINs, pagos y la clave del ESP32.
 
 **Paso 1 — Generar 2 claves secretas.** En una terminal de tu compu, corré este comando **dos
 veces** (cada vez sale una clave distinta):
@@ -83,36 +89,28 @@ contenedor) podría correr dos copias a la vez sobre el mismo volumen y romper l
   `php artisan migrate`, `3000:3000`): son ejemplos que muestra Coolify, no configuración real.
   Si alguno está escrito en blanco (no gris), borralo.
 
-### A2. Verificar que quedó bien
+</details>
 
-1. Avisame con este mensaje, copiado tal cual y completando lo que corresponda:
-   > listo el redeploy · la clave admin tiene 12 caracteres o más: SÍ · las 2 claves las generé
-   > con el comando de la guía: SÍ · el volumen es Volume Mount: SÍ
+### ✅ A2. Verificar que quedó bien — HECHO
 
-   Esas 3 cosas no las puedo ver desde afuera y deciden si el sitio levanta con el arreglo. Con
-   tu mensaje corro los chequeos desde afuera (que `/health` responda y que el login
-   `admin@hidro.local` / `hidro-demo-2025` **ya no entre**) y recién ahí subo el arreglo.
-2. Entrá a `https://hidro-api.insolvadev.com/admin` con tu `ADMIN_EMAIL` / `ADMIN_PASSWORD`
-   nuevos.
-3. Si después del redeploy el sitio no levanta y en **Logs** aparece `EACCES`, avisame (son
-   permisos de la carpeta del volumen).
-4. **Todavía no toques las patentes `AE100AA` y `AE200AA`.** Hoy el sistema las vuelve a crear en
-   cada arranque. Apenas vea tu "listo el redeploy", verifico y subo el arreglo; ahí te aviso y
-   hacés el paso A2b.
+Verificado desde afuera el 2026-09-15 después de tu confirmación:
+- `/health` responde OK.
+- Login `admin@hidro.local` / `hidro-demo-2025` → **401** (ya no entra). ✅
+- Subí el arreglo a `main` y Coolify redesplegó solo (~2 min). Bundle nuevo confirmado
+  (`index-86E0ubWO.js`) y escaneado: **cero** apariciones de `hidro-demo-2025`,
+  `admin@hidro.local`, `Credenciales DEMO`, `AE100AA`, `AE200AA` en los 6 archivos JS publicados.
 
-### A2b. Después de que te avise que subí el arreglo
+**Si todavía no entraste con tu `ADMIN_EMAIL` / `ADMIN_PASSWORD` nuevos, hacelo ahora** para
+confirmar que tu clave funciona (yo no puedo probar eso desde afuera). Si algo falla o ves
+`EACCES` en Logs, avisame.
 
-1. Admin → **Patentes**: borrá `AE100AA` y `AE200AA`.
-2. En el mismo formulario creá una patente de prueba: `AA000AA`, categoría socio, con un PIN de 4
-   dígitos cualquiera que no le digas a nadie.
-3. Apretá **Redeploy** en Coolify y esperá a que termine.
-4. Volvé a Admin → Patentes y fijate:
-   - `AA000AA` **sigue ahí** → el volumen guarda los datos. ✅
-   - `AE100AA` y `AE200AA` **no volvieron** → el arreglo funciona. ✅
-   - Si falta `AA000AA` o volvieron las demo, avisame.
-5. Borrá `AA000AA`.
+### 👉 A2b. Ahora sí — es lo próximo que falta
 
-### A3. Chequear que el sistema ve la IP real del cliente (importante para no dejar gente sin poder pagar)
+**HECHO — confirmado por vos el 2026-09-15.** Borraste `AE100AA`/`AE200AA`, creaste la patente
+de prueba, hiciste Redeploy y confirmaste que persiste y que las demo no vuelven. El volumen
+persistente queda validado en producción real, no solo en el test local. Nada más que hacer acá.
+
+### 👉 A3. Chequear que el sistema ve la IP real del cliente (importante para no dejar gente sin poder pagar) — seguí por acá
 
 Hay 3 "capas" delante de tu app (Cloudflare → túnel → Traefik) y necesitamos que el sistema sepa
 la IP real de cada visitante, no la de esas capas — si no, puede llegar a agrupar a TODOS los

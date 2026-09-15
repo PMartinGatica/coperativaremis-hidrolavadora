@@ -695,3 +695,14 @@
   clave sin `$` ni espacios, rotar `JWT_SECRET` tras compromiso, `NODE_ENV=production` en
   `--env-file`, HTTPS por subdominio como decisión de Pablo). Diferido a TODOS: revocación de JWT
   al rotar clave, guarda de `PUBLIC_APP_URL` localhost, device secret roto visible en `/health`.
+- **2026-09-15 (ADR-039).** ADR-038 desplegado en producción tras A1 confirmado por Pablo (6
+  variables, Volume Mount, Redeploy). `/cso --diff` sobre los 4 commits: 0 findings al gate 8/10.
+  Push a `origin/main`; Coolify redesplegó solo en ~2 min (bundle `index-86E0ubWO.js`).
+  Verificado desde afuera: `/health` OK, login `admin@hidro.local`/`hidro-demo-2025` → 401, los 6
+  archivos JS publicados escaneados sin `hidro-demo-2025`, `admin@hidro.local`,
+  `Credenciales DEMO`, `AE100AA` ni `AE200AA`. Riesgo 🔴 de ADR-037 (admin demo abierto) cerrado.
+- **2026-09-15 (ADR-040).** A2b confirmado por Pablo: borró `AE100AA`/`AE200AA`, creó una patente
+  de prueba con PIN, hizo Redeploy y verificó que persiste y que las demo no vuelven a crearse.
+  **El volumen persistente queda validado en producción real** (no solo en el test local con
+  Docker). Sigue el pipeline gstack (`/qa`, `/retro`) para cerrar la fase; en paralelo, Pablo
+  continúa con A3 (chequear IP real detrás de Cloudflare) y el resto de `pendientes-manual.md`.
