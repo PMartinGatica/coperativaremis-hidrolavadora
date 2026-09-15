@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   assertProductionConfig,
   DEMO_ADMIN_PASSWORD,
@@ -19,12 +19,29 @@ function prodConfig(patch: Partial<AppConfig> = {}): AppConfig {
 }
 
 describe('guardas de configuración de producción', () => {
+  beforeEach(() => {
+    // Un apps/api/.env local con PAYMENT_PROVIDER=mercadopago no tiene que cambiar el resultado.
+    vi.stubEnv('PAYMENT_PROVIDER', 'demo');
+  });
+
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
   it('config de producción válida no tira', () => {
     expect(() => assertProductionConfig(prodConfig())).not.toThrow();
+  });
+
+  it('los largos mínimos exactos (32 y 12) se aceptan', () => {
+    const cfg = prodConfig({ jwtSecret: 'j'.repeat(32), deviceAuthSecret: 'd'.repeat(32), adminPassword: 'x'.repeat(12) });
+    expect(() => assertProductionConfig(cfg)).not.toThrow();
+  });
+
+  it('JWT_SECRET igual a DEVICE_AUTH_SECRET -> tira', () => {
+    const same = 's'.repeat(64);
+    expect(() => assertProductionConfig(prodConfig({ jwtSecret: same, deviceAuthSecret: same }))).toThrow(
+      /tienen que ser distintos/,
+    );
   });
 
   it.each([

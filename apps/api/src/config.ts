@@ -8,9 +8,8 @@ import {
   DEVICE_ONLINE_THRESHOLD_MS,
 } from '@hidro/shared';
 
-export type NodeEnv = 'development' | 'test' | 'production';
-
-const NODE_ENVS: readonly string[] = ['development', 'test', 'production'];
+const NODE_ENVS = ['development', 'test', 'production'] as const;
+export type NodeEnv = (typeof NODE_ENVS)[number];
 
 export const DEV_SECRET_PLACEHOLDER = 'dev-only-change-me';
 export const DEMO_ADMIN_PASSWORD = 'hidro-demo-2025';
@@ -41,6 +40,8 @@ export interface AppConfig {
   mercadopagoAccessToken: string | null;
   mercadopagoPublicKey: string | null;
   mercadopagoWebhookSecret: string | null;
+  /** En producción con pagos DEMO, un ESP32 real no recibe autorizaciones salvo este opt-in (prueba en banco). */
+  allowDemoPaymentsOnDevice: boolean;
   jwtSecret: string;
   deviceAuthSecret: string;
   adminEmail: string;
@@ -78,6 +79,11 @@ function bool(value: string | undefined, fallback: boolean): boolean {
   return value.toLowerCase() === 'true';
 }
 
+// La clave con la que el seed crea o sincroniza el admin: la guarda valida exactamente esta.
+export function effectiveAdminPassword(config: AppConfig): string {
+  return config.seedOverrides.adminPassword ?? config.adminPassword;
+}
+
 // Un solo error con todos los problemas: se corrigen en un redeploy. Nombra variables, nunca valores.
 export function assertProductionConfig(config: AppConfig): void {
   const problems: string[] = [];
@@ -90,7 +96,10 @@ export function assertProductionConfig(config: AppConfig): void {
       `DEVICE_AUTH_SECRET falta, es el valor de desarrollo o tiene menos de ${MIN_SECRET_LENGTH} caracteres`,
     );
   }
-  const adminPassword = config.seedOverrides.adminPassword ?? config.adminPassword;
+  if (!isWeakSecret(config.jwtSecret) && config.jwtSecret === config.deviceAuthSecret) {
+    problems.push('JWT_SECRET y DEVICE_AUTH_SECRET tienen que ser distintos');
+  }
+  const adminPassword = effectiveAdminPassword(config);
   if (adminPassword === DEMO_ADMIN_PASSWORD || adminPassword.length < MIN_ADMIN_PASSWORD_LENGTH) {
     problems.push(`ADMIN_PASSWORD es la clave demo o tiene menos de ${MIN_ADMIN_PASSWORD_LENGTH} caracteres`);
   }
@@ -108,7 +117,7 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   }
 
   const rawNodeEnv = str(process.env.NODE_ENV, 'development');
-  if (!NODE_ENVS.includes(rawNodeEnv)) {
+  if (!(NODE_ENVS as readonly string[]).includes(rawNodeEnv)) {
     // Un typo (ej. "prod") apagaría en silencio todas las guardas de producción.
     throw new Error(`NODE_ENV inválido ("${rawNodeEnv}"): usar development, test o production.`);
   }
@@ -149,6 +158,7 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     mercadopagoAccessToken: mpToken,
     mercadopagoPublicKey: mpPublic,
     mercadopagoWebhookSecret: mpWebhook,
+    allowDemoPaymentsOnDevice: bool(process.env.ALLOW_DEMO_PAYMENTS_ON_DEVICE, false),
     jwtSecret: str(jwtSecret, DEV_SECRET_PLACEHOLDER),
     deviceAuthSecret: str(process.env.DEVICE_AUTH_SECRET, DEV_SECRET_PLACEHOLDER),
     // Normalizado a minúsculas: el login compara lowercase (evita lockout por mayúsculas).

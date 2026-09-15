@@ -54,7 +54,6 @@ migración es irreversible y el túnel también sirve las cámaras.
 ## Variables de entorno
 
 ```
-NODE_ENV=production
 API_PORT=3020
 API_HOST=0.0.0.0
 TRUST_PROXY=1
@@ -71,7 +70,16 @@ DAILY_WASH_LIMIT=2
 
 > Secretos en Windows sin `openssl`: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
 > `DEVICE_AUTH_SECRET` cifra los secrets de los dispositivos en la base: **se fija una vez y no se
-> rota** sin re-flashear cada ESP32.
+> rota** sin re-flashear cada ESP32. Tiene que ser distinto de `JWT_SECRET` (si no, no arranca).
+>
+> - **`NODE_ENV` no va en Coolify**: lo fija el `Dockerfile`. Si llegara al build como variable,
+>   `npm ci` podría saltear las devDependencies y el build fallaría.
+> - **Destildar "Available at Buildtime"** en todas: ninguna se usa al construir la imagen, y así
+>   los secretos no quedan en los argumentos de build.
+> - **`ADMIN_PASSWORD` solo con letras, números, `-` y `_`**: sin espacios ni `$` (Coolify puede
+>   interpretar `$` como variable y guardar otra clave, y los espacios de los bordes se recortan).
+> - **Después de un compromiso**, rotar `JWT_SECRET` junto con `ADMIN_PASSWORD`: cambiar solo la
+>   clave no invalida los tokens ya emitidos (duran 12 h).
 
 ### 🔴 `NODE_ENV=production` no es opcional: sin él se apagan TODAS las guardas
 
@@ -104,6 +112,11 @@ Logs) si:
 Además, en producción el login rechaza `hidro-demo-2025` para **cualquier** cuenta, aunque esté
 guardada en la base desde antes.
 
+Si en la base quedó alguna cuenta con `hidro-demo-2025` (por ejemplo, volumen agregado en un
+redeploy anterior al de las variables), al arrancar en producción se le pone una clave aleatoria
+y el log avisa `cuentas admin con la clave demo bloqueadas`. Así un rollback al código viejo no
+la vuelve a dejar entrar.
+
 **Qué se siembra al arrancar:**
 - Siempre (sobre una base vacía): máquinas `HIDRO-01/02`, sus dispositivos y la cuenta de
   `ADMIN_EMAIL`. Si la cuenta ya existe, su clave se **actualiza** a `ADMIN_PASSWORD`: es la forma
@@ -120,6 +133,17 @@ guardada en la base desde antes.
   autenticarse (el log de arranque avisa): hay que rotar el secret desde admin y re-flashear.
 - **Rollback** a un deploy anterior a ADR-038: ese código siembra patentes demo por defecto y las
   vuelve a crear en el volumen. Después de un rollback, borrarlas de nuevo.
+
+### 🔴 Pagos DEMO en producción: el ESP32 no recibe autorizaciones (ADR-038)
+
+Con `PAYMENT_PROVIDER=demo`, cualquier visitante puede aprobar su propio pago simulado desde un
+endpoint público. Por eso, en producción, **los dispositivos no reciben autorizaciones de pagos
+DEMO**: la web demo sigue funcionando hasta `AUTHORIZED`, pero la máquina nunca se habilita. El
+log de arranque lo avisa.
+
+`ALLOW_DEMO_PAYMENTS_ON_DEVICE=true` lo desactiva. Es solo para la prueba en banco con Pablo
+presente, sin contactor, y se saca apenas termina: con esa variable cargada, cualquiera lava gratis
+(`[STOP-HUMANO]`, ver `cadencia.md`).
 
 - `API_HOST=0.0.0.0` es **obligatorio**: con el default `127.0.0.1` el contenedor arranca pero es
   inalcanzable desde afuera.

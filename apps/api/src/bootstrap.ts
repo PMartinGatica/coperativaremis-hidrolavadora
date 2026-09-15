@@ -6,6 +6,7 @@ import { createLogger } from './logger.js';
 import { createPaymentProvider } from './payments/index.js';
 import { getDemoTimeScale } from './services/settingsService.js';
 import { sweepExpired } from './services/sessionService.js';
+import { isDemoAuthorizationWithheld } from './services/deviceService.js';
 import { recomputeMachineStatuses } from './services/machineService.js';
 import type { SimulatorHub } from './simulator/hub.js';
 import type { AppContext } from './context.js';
@@ -27,6 +28,11 @@ export async function createContext(overrides: Partial<AppConfig> = {}): Promise
 
   const logger = createLogger('api', config.logLevel);
   const provider = createPaymentProvider(config);
+  if (isDemoAuthorizationWithheld(config)) {
+    logger.warn(
+      'PAYMENT_PROVIDER=demo en producción: los dispositivos no reciben autorizaciones (ALLOW_DEMO_PAYMENTS_ON_DEVICE=true solo para la prueba en banco)',
+    );
+  }
 
   const ctx: AppContext = {
     config,

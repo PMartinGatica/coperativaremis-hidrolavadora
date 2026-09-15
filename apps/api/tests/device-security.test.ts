@@ -1,12 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { deviceEvents } from '../src/db/schema.js';
+import { deviceEvents, devices } from '../src/db/schema.js';
+import { getAuthorizationForDevice } from '../src/services/deviceService.js';
 import {
   createTestApp,
   deviceHeaders,
   DEVICE_IDS,
   payAndAuthorize,
   sessionStatus,
+  waitMachineStatus,
   waitSessionStatus,
   type TestCtx,
 } from './helpers.js';
@@ -123,5 +125,25 @@ describe('seguridad del protocolo de dispositivo', () => {
     expect(second.ok).toBe(false);
     const events = await t.ctx.db.select().from(deviceEvents).where(eq(deviceEvents.type, 'SESSION_STARTED'));
     expect(events.length).toBe(1);
+  });
+
+  it('en producción con pagos DEMO el dispositivo no recibe la autorización, salvo opt-in explícito', async () => {
+    t = await createTestApp();
+    await waitMachineStatus(t, 'HIDRO-01', 'ONLINE');
+    // Sin simulador consumiendo la autorización, la sesión queda AUTHORIZED para inspeccionarla.
+    t.ctx.simulator?.stop();
+    const { sessionId } = await payAndAuthorize(t);
+    const [device] = await t.ctx.db.select().from(devices).where(eq(devices.machineId, 'HIDRO-01'));
+
+    const prod = { ...t.ctx.config, nodeEnv: 'production' as const, paymentProvider: 'demo' as const };
+    const withheld = await getAuthorizationForDevice({ ...t.ctx, config: prod }, device!);
+    expect(withheld.authorization).toBeNull();
+    expect(await sessionStatus(t, sessionId)).toBe('AUTHORIZED');
+
+    const allowed = await getAuthorizationForDevice(
+      { ...t.ctx, config: { ...prod, allowDemoPaymentsOnDevice: true } },
+      device!,
+    );
+    expect(allowed.authorization?.session_id).toBe(sessionId);
   });
 });

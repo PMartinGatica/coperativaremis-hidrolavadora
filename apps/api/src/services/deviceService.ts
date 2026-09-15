@@ -42,6 +42,11 @@ export interface DeviceDeps {
 
 const lastPersistedEvent = new Map<string, Date>(); // machineId -> última inserción de heartbeat
 
+// Un pago DEMO se aprueba desde un endpoint público: entregarlo a un ESP32 real regalaría lavados.
+export function isDemoAuthorizationWithheld(config: AppConfig): boolean {
+  return config.nodeEnv === 'production' && config.paymentProvider === 'demo' && !config.allowDemoPaymentsOnDevice;
+}
+
 export async function registerHeartbeat(deps: DeviceDeps, device: DeviceRow, payload: HeartbeatPayload): Promise<DeviceAuthResponse> {
   const { db } = deps;
   const now = new Date();
@@ -115,7 +120,7 @@ export async function getAuthorizationForDevice(deps: DeviceDeps, device: Device
   const { db } = deps;
   const now = new Date();
   const auth = await getActiveAuthorizationForMachine(db, device.machineId, now);
-  if (!auth) {
+  if (!auth || isDemoAuthorizationWithheld(deps.config)) {
     return { authorization: null, server_time: now.getTime() };
   }
   const session = await getSession(db, auth.sessionId);

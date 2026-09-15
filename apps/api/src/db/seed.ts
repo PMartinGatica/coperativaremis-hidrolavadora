@@ -8,7 +8,7 @@ import {
   scryptSync,
   timingSafeEqual,
 } from 'node:crypto';
-import { and, eq, ne } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
   DEFAULT_DURATION_SECONDS,
   DEFAULT_PRICE_EXTERNO_ARS,
@@ -19,7 +19,7 @@ import {
 import type { Db } from './client.js';
 import { adminUsers, devices, machines, vehicles, type DeviceRow } from './schema.js';
 import { newDeviceSecret, uuid } from '../ids.js';
-import type { AppConfig } from '../config.js';
+import { DEMO_ADMIN_PASSWORD, effectiveAdminPassword, type AppConfig } from '../config.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('seed');
@@ -95,7 +95,7 @@ interface SeedMachineSpec {
  * Tarifas definidas por el cliente:
  *   $500 remis de la cooperativa · $2.000 auto de socio · $8.000 particular
  */
-export const DEMO_MACHINES: SeedMachineSpec[] = [
+const SEED_MACHINES: SeedMachineSpec[] = [
   {
     id: 'HIDRO-01',
     name: 'Hidrolavadora 10 HP',
@@ -127,7 +127,7 @@ export const DEMO_VEHICLES: Array<{ plate: string; category: 'remis' | 'socio'; 
 export async function runSeed(db: Db, config: AppConfig): Promise<SeedResult> {
   const deviceSecrets: Record<string, string> = {};
 
-  for (const spec of DEMO_MACHINES) {
+  for (const spec of SEED_MACHINES) {
     const existing = await db.select().from(machines).where(eq(machines.id, spec.id)).limit(1);
     if (existing.length === 0) {
       await db.insert(machines).values({
@@ -192,7 +192,7 @@ export async function runSeed(db: Db, config: AppConfig): Promise<SeedResult> {
   // Email SIEMPRE normalizado a minúsculas: el login compara lowercase, así que el seed no
   // puede crear un email inlogueable.
   const adminEmail = (config.seedOverrides.adminEmail ?? config.adminEmail).toLowerCase().trim();
-  const adminPassword = config.seedOverrides.adminPassword ?? config.adminPassword;
+  const adminPassword = effectiveAdminPassword(config);
   const admins = await db
     .select()
     .from(adminUsers)
@@ -217,11 +217,20 @@ export async function runSeed(db: Db, config: AppConfig): Promise<SeedResult> {
   }
 
   if (config.nodeEnv === 'production') {
+    const allAdmins = await db.select().from(adminUsers);
+    // Una fila con la clave demo sobrevive en el volumen y un rollback al código viejo la dejaría entrar.
+    const demoPasswordAdmins = allAdmins.filter((row) => verifySecret(DEMO_ADMIN_PASSWORD, row.passwordHash));
+    for (const row of demoPasswordAdmins) {
+      await db
+        .update(adminUsers)
+        .set({ passwordHash: hashSecret(randomBytes(32).toString('hex')) })
+        .where(eq(adminUsers.id, row.id));
+    }
+    if (demoPasswordAdmins.length > 0) {
+      log.warn('cuentas admin con la clave demo bloqueadas', { count: demoPasswordAdmins.length });
+    }
     // Una cuenta con email viejo sigue entrando y ya no cuenta como "la cuenta por defecto".
-    const others = await db
-      .select({ id: adminUsers.id })
-      .from(adminUsers)
-      .where(ne(adminUsers.email, adminEmail));
+    const others = allAdmins.filter((row) => row.email !== adminEmail);
     if (others.length > 0) {
       log.warn('hay cuentas admin distintas de ADMIN_EMAIL', { count: others.length });
     }

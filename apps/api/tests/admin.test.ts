@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
+import { DEMO_ADMIN_PASSWORD } from '../src/config.js';
 import { auditLogs } from '../src/db/schema.js';
 import { login } from '../src/services/adminService.js';
 import {
@@ -269,15 +270,15 @@ describe('panel administrativo', () => {
 
   it('en producción la clave demo no entra con ninguna cuenta, aunque esté guardada en la base', async () => {
     t = await createTestApp({
-      adminPassword: 'hidro-demo-2025',
-      seedOverrides: { deviceSecrets: DEVICE_SECRETS, adminEmail: 'admin@test.local', adminPassword: 'hidro-demo-2025' },
+      adminPassword: DEMO_ADMIN_PASSWORD,
+      seedOverrides: { deviceSecrets: DEVICE_SECRETS, adminEmail: 'admin@test.local', adminPassword: DEMO_ADMIN_PASSWORD },
     });
-    await expect(login(t.ctx, 'admin@test.local', 'hidro-demo-2025')).resolves.toMatchObject({
+    await expect(login(t.ctx, 'admin@test.local', DEMO_ADMIN_PASSWORD)).resolves.toMatchObject({
       email: 'admin@test.local',
     });
 
     const prodDeps = { ...t.ctx, config: { ...t.ctx.config, nodeEnv: 'production' as const } };
-    await expect(login(prodDeps, 'admin@test.local', 'hidro-demo-2025')).rejects.toMatchObject({
+    await expect(login(prodDeps, 'admin@test.local', DEMO_ADMIN_PASSWORD)).rejects.toMatchObject({
       code: 'UNAUTHORIZED',
     });
     const failed = await t.ctx.db.select().from(auditLogs).where(eq(auditLogs.action, 'ADMIN_LOGIN_FAILED'));

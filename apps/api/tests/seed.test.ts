@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { adminUsers, devices, machines, vehicles } from '../src/db/schema.js';
-import { runSeed } from '../src/db/seed.js';
+import { DEMO_ADMIN_PASSWORD } from '../src/config.js';
+import { hashSecret, runSeed, verifySecret } from '../src/db/seed.js';
 import { createTestApp, type TestCtx } from './helpers.js';
 
 let t: TestCtx;
@@ -36,5 +37,45 @@ describe('seed: instalación base vs. datos demo', () => {
     });
     await t.api.post('/api/admin/auth/login').send({ email: 'admin@test.local', password: 'otra-clave-123' }).expect(200);
     await t.api.post('/api/admin/auth/login').send({ email: 'admin@test.local', password: 'admin-pass' }).expect(401);
+  });
+
+  it('en producción bloquea cuentas con la clave demo y avisa por SEED_DEMO y cuentas extra, sin borrar', async () => {
+    t = await createTestApp();
+    await t.ctx.db.insert(adminUsers).values([
+      { id: 'admin-viejo', email: 'viejo@test.local', passwordHash: hashSecret('otra-clave-larga'), role: 'admin' },
+      { id: 'admin-demo', email: 'admin@hidro.local', passwordHash: hashSecret(DEMO_ADMIN_PASSWORD), role: 'admin' },
+    ]);
+    const stdout = vi.spyOn(process.stdout, 'write');
+    try {
+      await runSeed(t.ctx.db, { ...t.ctx.config, nodeEnv: 'production', seedDemo: true });
+      const out = stdout.mock.calls.map(([chunk]) => String(chunk)).join('');
+      expect(out).toContain('SEED_DEMO activo en producción');
+      expect(out).toContain('cuentas admin con la clave demo bloqueadas');
+      expect(out).toContain('hay cuentas admin distintas de ADMIN_EMAIL');
+    } finally {
+      stdout.mockRestore();
+    }
+    const rows = await t.ctx.db.select().from(adminUsers);
+    expect(rows).toHaveLength(3);
+    const demoRow = rows.find((row) => row.id === 'admin-demo');
+    expect(verifySecret(DEMO_ADMIN_PASSWORD, demoRow!.passwordHash)).toBe(false);
+    const oldRow = rows.find((row) => row.id === 'admin-viejo');
+    expect(verifySecret('otra-clave-larga', oldRow!.passwordHash)).toBe(true);
+    await t.api.post('/api/admin/auth/login').send({ email: 'admin@test.local', password: 'admin-pass' }).expect(200);
+  });
+
+  it('un device secret cifrado con otro DEVICE_AUTH_SECRET avisa y no se reemplaza', async () => {
+    t = await createTestApp();
+    const [before] = await t.ctx.db.select().from(devices).where(eq(devices.machineId, 'HIDRO-01'));
+    const stdout = vi.spyOn(process.stdout, 'write');
+    try {
+      await runSeed(t.ctx.db, { ...t.ctx.config, deviceAuthSecret: 'x'.repeat(40) });
+      const out = stdout.mock.calls.map(([chunk]) => String(chunk)).join('');
+      expect(out).toContain('device secret no descifra');
+    } finally {
+      stdout.mockRestore();
+    }
+    const [after] = await t.ctx.db.select().from(devices).where(eq(devices.machineId, 'HIDRO-01'));
+    expect(after?.secretEnc).toBe(before?.secretEnc);
   });
 });

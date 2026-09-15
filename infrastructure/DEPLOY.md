@@ -38,11 +38,15 @@ TEST_SPEED_FACTOR=1
 
 Generar los secretos con `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
 
+> ⚠️ Con `docker run --env-file apps/api/.env`, el archivo **tiene que** decir `NODE_ENV=production`:
+> la variable del archivo pisa la del `Dockerfile`, y `.env.example` trae `development`, que apaga
+> todas las guardas de producción.
+
 ### 2) Build y ejecución (dos opciones)
 
 ```bash
 # opción A: proceso directo
-npm install && npm run build
+npm install && npm run build && npm run check:bundle   # check:bundle falla si el build publica datos demo
 npm run start:api      # API en :3020
 
 # opción B: contenedor (Dockerfile multi-stage en la raíz del repo)

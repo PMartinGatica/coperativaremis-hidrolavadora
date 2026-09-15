@@ -6,20 +6,18 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const distDir = path.join(root, 'apps', 'web', 'dist');
 const FORBIDDEN = ['hidro-demo-2025', 'admin@hidro.local', 'Credenciales DEMO', 'AE100AA', 'AE200AA'];
-
-function walk(dir) {
-  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const full = path.join(dir, entry.name);
-    return entry.isDirectory() ? walk(full) : [full];
-  });
-}
+// Todo lo servido cuenta (.map, .json, .css…); solo se saltean binarios.
+const BINARY = /\.(png|jpe?g|gif|webp|avif|ico|woff2?|ttf|otf|eot)$/i;
 
 if (!fs.existsSync(distDir)) {
   console.error(`check:bundle: no existe ${distDir}. Corré npm run build antes.`);
   process.exit(1);
 }
 
-const files = walk(distDir).filter((f) => /\.(js|html)$/.test(f));
+const files = fs
+  .readdirSync(distDir, { recursive: true })
+  .map((f) => path.join(distDir, f))
+  .filter((f) => fs.statSync(f).isFile() && !BINARY.test(f));
 if (!files.some((f) => f.endsWith('.js'))) {
   console.error(`check:bundle: ${distDir} no tiene archivos .js; no hay nada que revisar.`);
   process.exit(1);
