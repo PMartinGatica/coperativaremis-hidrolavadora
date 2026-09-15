@@ -24,6 +24,9 @@ Este es el único Mundo que mueve **potencia eléctrica y un motor de 10 HP**. A
   que se lo re-flashee.
 - **Pasar `PAYMENT_PROVIDER` de `demo` a `mercadopago`.** Es el momento en que se empieza a cobrar
   plata real.
+- **Cargar `ALLOW_DEMO_PAYMENTS_ON_DEVICE=true` en producción.** Mientras esté puesta, cualquiera
+  que apruebe un pago demo habilita la máquina real. Solo durante la prueba en banco, y se saca
+  apenas termina (ADR-038).
 
 ## Fase 1 — Aprobación manual  ← ESTAMOS ACÁ
 El humano prueba e itera a mano. El agente no ejecuta nada solo. Hoy: modo DEMO completo

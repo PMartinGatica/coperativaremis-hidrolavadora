@@ -95,6 +95,23 @@
   volumen arriesgan corromper la base. Origen: `/autoplan` (voz eng) sobre
   `docs/designs/guardas-produccion-seed.md`, 2026-09-15.
 
+- **[Backlog, seguridad]** Revocar sesiones admin al rotar la clave: `verifyToken`
+  (`adminService.ts:57`) solo valida firma y vencimiento, así que un JWT emitido antes de
+  cambiar `ADMIN_PASSWORD` (o de borrar la cuenta) sigue sirviendo hasta 12 h. Fix: versión de
+  token o `passwordChangedAt` en `admin_users`, chequeado en cada request. Mientras tanto, el
+  deploy doc indica rotar `JWT_SECRET` junto con la clave tras un compromiso. Origen: `/review`
+  (especialista de seguridad) sobre ADR-038, 2026-09-15.
+
+- **[Hardening]** `PUBLIC_APP_URL` apuntando a `localhost` en producción no frena ni avisa: el
+  QR impreso de la máquina y los `back_urls` de Mercado Pago quedarían rotos. Evaluar un warning
+  (o sumarlo a `assertProductionConfig`) cuando se pase a Mercado Pago. Origen: `/review`
+  (adversarial) sobre ADR-038, 2026-09-15.
+
+- **[Observabilidad]** Un device secret que no descifra con `DEVICE_AUTH_SECRET` hoy solo loguea
+  un warning al arrancar; `/health` sigue en OK y el ESP32 falla en la calle con
+  `DEVICE_UNAUTHORIZED`. Mostrarlo en `/health` o en el panel. Origen: `/review` (adversarial)
+  sobre ADR-038, 2026-09-15.
+
 ## Resueltos
 
 (ninguno todavía)

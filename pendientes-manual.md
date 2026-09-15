@@ -41,7 +41,7 @@ claves.
 | `JWT_SECRET` | la 1ª clave del paso 1 |
 | `DEVICE_AUTH_SECRET` | la 2ª clave del paso 1 |
 | `ADMIN_EMAIL` | tu mail real |
-| `ADMIN_PASSWORD` | una clave propia de **12 caracteres o más** |
+| `ADMIN_PASSWORD` | una clave propia de **12 caracteres o más**, solo letras, números, `-` y `_` |
 
 - 🔴 **Hacelo hoy:** la página `/admin` publicada muestra escritas en pantalla las credenciales
   demo (`Credenciales DEMO: admin@hidro.local / hidro-demo-2025`). Cualquiera que entre las lee.
@@ -50,9 +50,15 @@ claves.
   es la de demo. Si ya cargaste una clave admin más corta, cambiala ahora.
 - `PUBLIC_APP_URL` vacía = el QR de la máquina (el que se imprime y se pega) apunta a
   `localhost` y no le abre a nadie.
-- 🔴 **NO agregues `SEED_DEMO=false`.** La guía vieja lo pedía y estaba mal: esa variable apaga
-  también la creación de la máquina HIDRO-01 y de tu cuenta admin. Quedarías sin máquina y sin
-  poder entrar.
+- 🔴 **NO agregues `SEED_DEMO=false`, y si ya la tenés cargada, borrala.** La guía vieja la pedía
+  y estaba mal: con el código actual apaga también la creación de la máquina HIDRO-01 y de tu
+  cuenta admin. Quedarías sin máquina y sin poder entrar.
+- En cada variable, **destildá "Available at Buildtime"**: ninguna se usa al construir y así las
+  claves no quedan guardadas en la imagen. Tampoco cargues `NODE_ENV`.
+- En la clave admin evitá espacios y el signo `$`: Coolify puede interpretar el `$` y guardar otra
+  clave distinta de la que vas a tipear.
+- Las 2 claves generadas tienen que ser **distintas** entre sí (el comando da una distinta cada
+  vez; solo no pegues la misma dos veces).
 - 🔴 **`DEVICE_AUTH_SECRET` se carga una vez y no se cambia nunca más.** Con ella se guardan
   cifradas las claves de los ESP32: si la cambiás después, la máquina deja de poder conectarse.
 - `NODE_ENV` no hace falta: ya viene fijado dentro del Dockerfile (verificado desde afuera:
@@ -210,6 +216,14 @@ preguntarte de nuevo):
   MP antes de cobrar plata de verdad. Sin esto, todo sigue probado solo contra el modo DEMO.
 
 ---
+
+- [ ] **C3. Decisión de infraestructura: forzar HTTPS en `hidro-api.insolvadev.com`.** Hoy
+  `http://hidro-api.insolvadev.com` responde sin redirigir a `https://` (verificado): si alguien
+  entra al panel por `http://`, la clave viaja sin cifrar hasta Cloudflare. Se arregla en
+  Cloudflare con una regla **solo para ese subdominio** (Configuration Rule o Page Rule "Always
+  Use HTTPS"). **No actives "Always Use HTTPS" para toda la zona** sin revisar antes qué otros
+  servicios (las cámaras, por ejemplo) usan `http://`. Es tu decisión porque toca la
+  infraestructura compartida.
 
 ## PARTE D — Fuera de lo que se puede resolver desde una compu
 

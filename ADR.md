@@ -676,3 +676,22 @@
   **Puerta (a):** 107 tests de `apps/api` verdes (87 previos + 20 nuevos), `tsc` limpio en api y
   web, `npm run build && npm run check:bundle` verde, check negativo verificado (falla con un
   string demo inyectado y sin `dist`). No toca `firmware/`.
+  **`/review` (4 subagentes: testing, seguridad, mantenibilidad+perf+simplificación, adversarial;
+  Codex no disponible en Windows):** 28 hallazgos, ninguno regresión del fix. Hallazgo más serio,
+  confirmado por 2 fuentes y **preexistente**: con `PAYMENT_PROVIDER=demo` en producción,
+  `POST /api/public/payments/:id/simulate` es público, así que el día que un ESP32 se conecte a
+  ese deploy cualquiera se aprueba un lavado. Hoy no es explotable (máquina OFFLINE →
+  `OUT_OF_SERVICE`, no se crean sesiones). Pablo eligió (D1 de /review) cerrarlo ya: en
+  producción con pagos demo `getAuthorizationForDevice` no entrega autorizaciones salvo
+  `ALLOW_DEMO_PAYMENTS_ON_DEVICE=true` (nuevo `[STOP-HUMANO]` en `cadencia.md`, para la prueba en
+  banco); la web demo sigue igual y el arranque lo avisa. También eligió: al arrancar en
+  producción, las cuentas admin cuya clave verifica contra `hidro-demo-2025` reciben una clave
+  aleatoria (cubre volumen agregado antes que las variables y rollbacks), sin borrar filas.
+  Aplicados además: `JWT_SECRET` distinto de `DEVICE_AUTH_SECRET`, `effectiveAdminPassword()`
+  único para guarda y seed, `NodeEnv` derivado de `NODE_ENVS`, `SEED_MACHINES` (no demo),
+  `check:bundle` revisa todo archivo no binario (incluye `.map`), 7 tests nuevos (bordes 32/12,
+  ramas de producción del seed, device secret que no descifra, pagos demo en dispositivo, stub de
+  `PAYMENT_PROVIDER`), docs (no cargar `NODE_ENV` en Coolify, destildar "Available at Buildtime",
+  clave sin `$` ni espacios, rotar `JWT_SECRET` tras compromiso, `NODE_ENV=production` en
+  `--env-file`, HTTPS por subdominio como decisión de Pablo). Diferido a TODOS: revocación de JWT
+  al rotar clave, guarda de `PUBLIC_APP_URL` localhost, device secret roto visible en `/health`.

@@ -6,10 +6,11 @@
 ## Arranque de la próxima sesión
 1. Cargá SOLO este `ESTADO.md` + `CLAUDE.md` del Mundo. `export GSTACK_PROJECT_SLUG=
    PMartinGatica-hidro-self-service` antes de la primera skill de gstack.
-2. **ADR-038 construido y commiteado SOLO EN LOCAL, sin push** (guardas de producción
-   fail-closed + seed base/demo + clave demo bloqueada + bundle sin strings demo). Puerta (a)
-   verde: 107 tests, `tsc`, `check:bundle`, imagen Docker probada. Faltan `/review` + `/cso`,
-   `/qa` y `/ship`.
+2. **ADR-038 construido, revisado (`/review`) y commiteado SOLO EN LOCAL, sin push** (guardas
+   de producción fail-closed + seed base/demo + clave demo bloqueada + bundle sin strings demo +
+   ESP32 sin autorizaciones de pagos demo en producción salvo `ALLOW_DEMO_PAYMENTS_ON_DEVICE`).
+   Puerta (a) verde: 123 tests del monorepo, `tsc`, `check:bundle`, imagen Docker probada.
+   Faltan `/cso`, `/qa`, `/ship` y `/retro`.
 3. **No pushear hasta que Pablo mande "listo el redeploy" con las 3 confirmaciones**
    (`pendientes-manual.md` A2.1) y verificar desde afuera: `/health` ok y login
    `admin@hidro.local`/`hidro-demo-2025` → 401. Con el fix, producción sin sus claves = crash
