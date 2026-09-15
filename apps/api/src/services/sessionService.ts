@@ -318,7 +318,13 @@ export async function finishSession(deps: Pick<SessionDeps, 'db' | 'logger'>, ma
       throw new AppError('AUTH_WRONG_MACHINE', 'La sesión no pertenece a esta máquina.', { sessionId, machineId });
     }
     if (session.status === 'FINISHED') return { ok: true, idempotent: true };
-    const row = await transitionSession(tx, sessionId, 'RUNNING', 'FINISHED', { finishedAt: new Date() });
+    // El dispositivo reporta el fin recién al reconectar (puede tardar si estuvo offline);
+    // el timer es LOCAL y corta puntual, así que reconstruimos la hora real de corte a
+    // partir de startedAt + duración en vez de usar la hora de recepción del reporte.
+    const finishedAt = session.startedAt
+      ? new Date(Math.min(session.startedAt.getTime() + session.durationSeconds * 1000, Date.now()))
+      : new Date();
+    const row = await transitionSession(tx, sessionId, 'RUNNING', 'FINISHED', { finishedAt });
     await insertAudit(tx, { actor: 'device', action: 'SESSION_FINISHED', entity: 'session', entityId: sessionId, metadata: { sessionId, machineId, durationSeconds } });
     await insertAudit(tx, { actor: 'device', action: 'RELAY_OFF', entity: 'session', entityId: sessionId, metadata: { sessionId, machineId } });
     return { ok: true, idempotent: false, status: row?.status ?? 'FINISHED' };
