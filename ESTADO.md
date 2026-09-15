@@ -10,20 +10,20 @@
    sobrevive sin internet) contra el dispositivo real, y arregló ISSUE-001 (medium: `finishedAt`
    usaba la hora de reconexión, no la de corte real), con test de regresión, 113/113 verdes.
    `/retro` (7d): 9 commits, test ratio 11% (↑5pp), sin deuda de shortcuts. Storyline actualizado.
-3. **Arrancar por acá: pushear el commit `9f8c6c8`** (fix + test de ISSUE-001) — quedó local,
-   sin pushear. Push a `main` redespliega solo en Coolify (como en ADR-039): confirmar con el
-   humano antes, es una acción sobre producción real.
-4. **En paralelo, Pablo sigue con `pendientes-manual.md` desde A3** (chequear IP real detrás de
-   Cloudflare) — A1, A2 y A2b ya están tachados. **A4 es lo único que falta para dar la Fase 1
-   por cerrada del todo** (prueba de "pago que se recupera solo", en la compu de Pablo).
+3. **Ya pusheado y redesplegado.** El fix de ISSUE-001 (`9f8c6c8`) está en `main` y Coolify
+   redesplegó solo; verificado desde afuera: `/health` → 200 OK, `uptimeSeconds` bajo (proceso
+   nuevo), sin cambios en `payments`/`devices`/`speedFactor`. **Arrancar por acá:** nada de código
+   pendiente — seguir con el punto 4.
+4. **Pablo sigue con `pendientes-manual.md` desde A3** (chequear IP real detrás de Cloudflare) —
+   A1, A2 y A2b ya están tachados. **A4 es lo único que falta para dar la Fase 1 por cerrada del
+   todo** (prueba de "pago que se recupera solo", en la compu de Pablo).
 
 ## Dónde estamos
 Producción (`hidro-api.insolvadev.com`) corre con el fix de seguridad desplegado y validado
 punta a punta (ADR-039/040): claves propias, volumen persistente confirmado en real, login demo
 bloqueado, bundle limpio, patentes demo eliminadas. `/qa` confirmó el invariante de seguridad #1
-contra el dispositivo real (no solo el reporte del servidor) y arregló un detalle de timestamp
-(ADR-041, sin pushear todavía). Firmware compila, nunca corrió en hardware. Fase de cadencia: 1
-(manual, modo DEMO).
+contra el dispositivo real y arregló un detalle de timestamp (ADR-041, ya en producción, `/health`
+verificado). Firmware compila, nunca corrió en hardware. Fase de cadencia: 1 (manual, modo DEMO).
 
 ## Riesgos abiertos (en orden de daño)
 - 🔴 **Healthcheck de Coolify debe quedar apagado** mientras la base sea PGlite (TODOS.md).

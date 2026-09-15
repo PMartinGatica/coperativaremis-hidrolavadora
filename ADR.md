@@ -725,5 +725,7 @@
   shortcuts, sin PRs (flujo directo a `main`). Storyline actualizado en
   `redessociales-hidro-self-service.md` (capítulo "FASE-1 (continuación)"): botón de mesa de
   entrada (ADR-034), PIN anti-abuso (ADR-036) y puesta en producción real (ADR-037/038/039/040)
-  contados como historia de usuario. Falta pushear el commit y que Pablo corra A4
-  (`pendientes-manual.md`) para dar la Fase 1 por cerrada del todo.
+  contados como historia de usuario. Pusheado a `main`; Coolify redesplegó solo. Verificado desde
+  afuera: `/health` → 200 OK (`{"status":"ok","database":"OK","payments":"DEMO","devices":"ONLINE
+  0/2","speedFactor":1}`), sin cambios de comportamiento respecto del deploy anterior. Falta que
+  Pablo corra A4 (`pendientes-manual.md`) para dar la Fase 1 por cerrada del todo.
