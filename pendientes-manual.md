@@ -10,7 +10,9 @@
 > confirmado con una patente de prueba real (borrar demo → crear → Redeploy → sigue ahí).
 > **Lo que sigue es A3.** ⚠️ Coolify despliega solo cada vez que se sube código a `main`
 > (tarda ~2 minutos). El ítem de ADR-007 (patente) se sacó: lo resolvió el PIN (ADR-036).
-> `mensajes/mensaje-dueno.md` ya tiene 2 preguntas, no 3.
+> `mensajes/mensaje-dueno.md` ya tiene 2 preguntas, no 3. **A4 se simplificó:** el paso de cambiar
+> `ADMIN_EMAIL` en `.env` no hacía falta (esa regla es solo para aprobar pagos a mano, y A4 no
+> usa esa función) — sacado, ahora son 2 pasos de preparación en vez de 3.
 
 ---
 
@@ -133,20 +135,15 @@ compu, local**, no en producción. Son ~15 minutos. Comandos ya armados, copiá 
 **Preparación (una sola vez):**
 1. `npm run build` y después `npm run dev -w @hidro/api` (queda escuchando en
    `http://localhost:3020`).
-2. Parate el servidor (Ctrl+C), en el archivo `.env` cambiá momentáneamente la línea
-   `ADMIN_EMAIL` a cualquier otra cosa, ej. `ADMIN_EMAIL=otra@ejemplo.local`. Al arrancar se crea
-   una cuenta extra con ese mail, pero la de siempre sigue existiendo y el sistema deja de
-   tratarla como "la cuenta por defecto", así que puede probar el camino de éxito. Volvé a
-   levantar el servidor.
-3. Login (con el mail y clave de SIEMPRE, no el que pusiste en el paso anterior):
+2. Login (con el mail y clave de siempre):
    ```
    curl -s -X POST http://localhost:3020/api/admin/auth/login -H "Content-Type: application/json" -d "{\"email\":\"admin@hidro.local\",\"password\":\"hidro-demo-2025\"}"
    ```
-   Copiá el valor de `token` de la respuesta — lo vas a necesitar en el paso 4.
-4. Bajá el tiempo de espera de un pago pendiente a 60 segundos (por defecto son 10 minutos,
+   Copiá el valor de `token` de la respuesta — lo vas a necesitar en el paso 3.
+3. Bajá el tiempo de espera de un pago pendiente a 60 segundos (por defecto son 10 minutos,
    mucho para probar):
    ```
-   curl -s -X PATCH http://localhost:3020/api/admin/settings -H "Authorization: Bearer TOKEN_DEL_PASO_3" -H "Content-Type: application/json" -d "{\"paymentPendingTimeoutSeconds\": 60}"
+   curl -s -X PATCH http://localhost:3020/api/admin/settings -H "Authorization: Bearer TOKEN_DEL_PASO_2" -H "Content-Type: application/json" -d "{\"paymentPendingTimeoutSeconds\": 60}"
    ```
 
 **La prueba en sí:**
@@ -166,8 +163,6 @@ compu, local**, no en producción. Son ~15 minutos. Comandos ya armados, copiá 
 5. Consultá de nuevo la sesión (mismo comando del paso 3) → tiene que decir
    `"status":"AUTHORIZED"`. **Si dice eso, la prueba salió bien: el pago tardío se recuperó
    solo, sin que nadie tuviera que hacer nada a mano.**
-6. Volvé a poner `ADMIN_EMAIL` en `.env` a su valor original (`admin@hidro.local`) y reiniciá el
-   servidor, para dejar todo como estaba.
 
 **✅ Si el paso 5 dio `AUTHORIZED`:** marcá acá abajo que la Fase 1 quedó validada:
 - [ ] Prueba de recuperación de pago corrida y con resultado `AUTHORIZED` en el paso 5.
