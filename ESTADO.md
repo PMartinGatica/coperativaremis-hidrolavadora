@@ -1,21 +1,25 @@
 # ESTADO — MUNDO: HIDRO SELF-SERVICE
 
 > Handoff entre sesiones. Reescribir, no acumular. ≤40 líneas.
-> Última actualización: 2026-09-15 (noche) · detalle en `ADR.md` (014–043)
+> Última actualización: 2026-09-17 · detalle en `ADR.md` (014–044)
 
 ## Arranque de la próxima sesión
 1. Cargá SOLO este `ESTADO.md` + `CLAUDE.md` del Mundo. `export GSTACK_PROJECT_SLUG=
    PMartinGatica-hidro-self-service` antes de la primera skill de gstack.
-2. **`/qa`+`/retro` cerraron el pipeline (ADR-041), fix ya en producción y verificado.** Sin
-   pendientes de código de esa parte.
-3. **A4 corrido por Pablo en vivo y con éxito (ADR-042/043) — pero NO cierra la Fase 1 solo.**
-   Filas 1-5 de `qa/FASE-1-manual.md` quedaron ☑ (mecanismo central de recuperación de pagos
-   funciona). Falta la fila 6, 4 casos borde, y sobre todo **probar la reconciliación desde el
-   panel de admin con una cuenta NO-default** — eso es lo que de verdad cierra la puerta (b).
-   Nuevo ítem **A4b** en `pendientes-manual.md`. **Arrancar por acá:** guiar a Pablo por A4b si
-   quiere seguir, o por A3 si prefiere dejarlo para otro día — no hay apuro, no toca producción.
-   Aprendizaje: no declarar una fase cerrada sin releer su guía formal (`FASE-N.md` +
-   `qa/FASE-N-manual.md`) — un checklist secundario puede estar desactualizado vs. el gate real.
+2. **FASE 1 CERRADA DEL TODO (ADR-044).** A4b corrida con Pablo en el navegador con su propia
+   cuenta: los 4 casos UI + el caso terminal (reintentar sobre sesión ya recuperada) salieron OK.
+   El único caso no reproducible a mano (pago aprobado justo antes de vencer, vía botón) está
+   confirmado por código como límite del proveedor DEMO, cubierto por test automático. Veredicto
+   humano marcado en `qa/FASE-1-manual.md`. **No hay pendientes de código de Fase 1.**
+3. **Bug encontrado y corregido en la guía (no en el código):** el servidor en modo dev
+   (`npm run dev -w @hidro/api` = `node dist/index.js`) NO lee `.env` — no hay `dotenv` en el
+   código. Para simular una cuenta admin NO-default hay que exportar `ADMIN_EMAIL` en la terminal
+   antes de levantar el server, no editar `.env`. Ya corregido en `qa/FASE-1-manual.md`
+   (Preparación, punto 2). Si en algún momento se agrega carga real de `.env` en dev, revisar que
+   esa guía siga siendo correcta.
+4. **Arrancar por acá:** preguntarle a Pablo si sigue con **A3** (chequeo de IP real detrás de
+   Cloudflare, no crítico, se puede dejar) o con la **Parte B** (mandar los 2 mensajes ya
+   redactados a técnicos y al dueño). Ninguno de los dos toca producción ni bloquea nada.
 
 ## Dónde estamos
 Producción (`hidro-api.insolvadev.com`) corre con el fix de seguridad desplegado y validado
@@ -33,7 +37,9 @@ verificado). Firmware compila, nunca corrió en hardware. Fase de cadencia: 1 (m
 - HTTP sin redirect a HTTPS en el subdominio (decisión de Pablo, C3 en `pendientes-manual.md`).
 - `refundPayment()` stub — política de reembolso pendiente del dueño.
 - `drizzle-kit generate` desincronizado (sin snapshots) — no afecta producción.
+- `.env` no se carga en modo dev (sin `dotenv`) — no afecta producción (Coolify inyecta env vars
+  reales), pero cualquier guía que diga "editar `.env` y reiniciar" está mal para desarrollo local.
 
 ## Pendientes humanos
-Ver `pendientes-manual.md`. A3 chequea IP real; **A4b cierra la Fase 1** (reconciliación desde
-la UI, cuenta NO-default); B = 2 mensajes listos; C/D = terceros y hardware.
+Ver `pendientes-manual.md`. **Fase 1 cerrada.** Queda A3 (chequea IP real, no crítico); B = 2
+mensajes listos para mandar; C/D = terceros y hardware (fuera del alcance de Fase 1).

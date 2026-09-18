@@ -5,16 +5,13 @@
 > hacer, cómo, y cómo saber que salió bien. Andá tachando. Cuando termines uno, avisame y lo saco
 > de acá (si generó una decisión, queda su rastro en `ADR.md`).
 >
-> Última actualización: 2026-09-15 (noche). **A1, A2 y A2b hechos.** El arreglo de seguridad
-> (ADR-038) está en producción, verificado desde afuera, con volumen persistente confirmado
-> real. **A4 corrida y con éxito (ADR-042), pero OJO — corrijo algo que dije mal:** A4 valida
-> el mecanismo central (el pago que se recupera solo), no toda la puerta (b) de la Fase 1. La
-> guía formal (`qa/FASE-1-manual.md`) tiene más casos — sobre todo probar la reconciliación
-> **desde el panel de admin**, con una cuenta que no sea la de fábrica — que A4 no cubre. No
-> digo más "Fase 1 cerrada del todo" hasta que eso también esté hecho; ver el nuevo ítem A4b
-> abajo con lo que falta en limpio. **Lo que sigue: A3, y después A4b.** ⚠️ Coolify despliega
-> solo cada vez que se sube código a `main` (tarda ~2 minutos). El ítem de ADR-007 (patente) se
-> sacó: lo resolvió el PIN (ADR-036). `mensajes/mensaje-dueno.md` ya tiene 2 preguntas, no 3.
+> Última actualización: 2026-09-17. **A1, A2, A2b y A4b hechos — FASE 1 CERRADA DEL TODO
+> (ADR-044).** A4b se corrió con Pablo en el navegador, con su propia cuenta (no la de fábrica):
+> los 4 casos reproducibles a mano salieron OK, y el veredicto de `qa/FASE-1-manual.md` quedó
+> confirmado. Lo único pendiente ahora es lo que NO toca la Fase 1: A3 (chequeo de IP real,
+> puede esperar) y las Partes B/C/D (mensajes, terceros, hardware). ⚠️ Coolify despliega solo
+> cada vez que se sube código a `main` (tarda ~2 minutos). El ítem de ADR-007 (patente) se sacó:
+> lo resolvió el PIN (ADR-036). `mensajes/mensaje-dueno.md` ya tiene 2 preguntas, no 3.
 
 ---
 
@@ -173,28 +170,23 @@ Invoke-RestMethod -Uri "http://localhost:3020/api/public/payments/$extPaymentId/
 
 </details>
 
-### 👉 A4b. Terminar la puerta (b) de la Fase 1: reconciliación desde el panel de admin
+### ✅ A4b. Terminar la puerta (b) de la Fase 1: reconciliación desde el panel de admin — HECHO
 
-Esto es lo que falta para que la Fase 1 cierre del todo. Es más largo que A4 — calculá 30-40
-minutos, y necesita el navegador (no solo la terminal). La guía completa, con cada caso y qué
-tiene que pasar, ya está escrita en `qa/FASE-1-manual.md` — pedime que te la vaya guiando paso a
-paso cuando quieras arrancar (usa el mismo truco del `.env`/`ADMIN_EMAIL` que sacamos de A4, pero
-ahí SÍ hace falta, porque esta vez estás probando la reconciliación de verdad).
+**Corrida por vos el 2026-09-17, en el navegador, con tu propia cuenta (no la de fábrica).**
+Encontramos y arreglamos en el camino que el `.env` no se estaba leyendo en modo dev (no hay
+`dotenv` en el código) — la guía quedó corregida con el paso real (`$env:ADMIN_EMAIL` en la
+terminal). Resultados:
+- Sin pago aprobado → mensaje ámbar correcto, no autoriza nada.
+- ID de pago equivocado a mano → `session_id_mismatch`, no autoriza nada.
+- Servidor caído → banner ámbar de "actualización pausada", se recupera solo.
+- Reintentar sobre una sesión YA recuperada → `not_recoverable`, no genera una segunda
+  autorización.
+- El único caso que NO se puede probar a mano (pago aprobado justo antes de vencer, vía botón)
+  lo confirmamos por código: es un límite del proveedor DEMO, no una falla — ya está cubierto por
+  el test automático.
 
-En criollo, lo que falta probar:
-- **Desde el panel** (`/admin/sessions`, no la terminal): que el botón "Reintentar automático"
-  funcione de verdad con una cuenta que no sea `admin@hidro.local` — hoy solo está probado que el
-  botón existe y que la cuenta de fábrica lo tiene bloqueado, falta el camino de éxito real.
-  También: que el mensaje "no hay pago" salga bien cuando corresponde, y que cargar un ID de pago
-  equivocado a mano dé el error correcto (no que autorice algo por error).
-  Casos con la cuenta NO-fábrica (los 4 que faltan de la guía).
-- **Un caso borde por terminal:** que si intentás reconciliar una sesión que YA se recuperó sola
-  (como la que probamos en A4), el sistema diga "no hace falta" en vez de generar una segunda
-  autorización por las dudas.
-- Marcar el veredicto final en `qa/FASE-1-manual.md` (al final del archivo) cuando esté todo OK.
-
-Si preferís dejarlo para otro día, avisame y seguimos con A3 mientras tanto — no hay apuro, nada
-de esto toca producción.
+**Veredicto confirmado en `qa/FASE-1-manual.md` (2026-09-17). La Fase 1 queda cerrada del todo
+(ADR-044).**
 
 ---
 

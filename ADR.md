@@ -764,3 +764,28 @@
   marcar. Aprendizaje para la próxima vez: verificar contra la guía formal del gate (`FASE-N.md` +
   `qa/FASE-N-manual.md`) antes de declarar una fase cerrada, no confiar en el resumen de un
   checklist secundario (`pendientes-manual.md`) que puede estar desactualizado respecto al gate.
+- **2026-09-17 (ADR-044). A4b corrida con Pablo en vivo — FASE 1 CERRADA DEL TODO.** Guiado paso
+  a paso por el navegador (`/admin/sessions`) con su propia cuenta (`ADMIN_EMAIL` override, NO la
+  de fábrica). Encontrado y corregido en el camino: **`.env` no se leía en modo dev** — `npm run
+  dev -w @hidro/api` corre `node dist/index.js` a secas, sin `dotenv` en el código (confirmado
+  grepeando `apps/api/src`), así que cambiar `ADMIN_EMAIL` en `.env` no tenía ningún efecto (el
+  primer intento de reconciliar dio `default_admin_forbidden` en vez del mensaje esperado).
+  Arreglo sin tocar código: exportar la variable en la terminal (`$env:ADMIN_EMAIL = "..."` antes
+  de `npm run dev`) — confirmado en el log de arranque. Corregido el paso 2 de "Preparación" en
+  `qa/FASE-1-manual.md` para que no repita el mismo error la próxima vez.
+  Resultados de los 4 casos UI + 1 caso terminal: fila 5 (sin pago aprobado) → mensaje ámbar
+  correcto; fila 6 (`session_id_mismatch` con ID inventado) → mensaje ámbar correcto; fila 8
+  (servidor caído, banner "actualización pausada") → correcto, se recupera solo; fila 6 de la
+  tabla principal (reintentar sobre sesión `HS-JEB3FF` ya recuperada, `WAITING_FOR_BUTTON`) →
+  `not_recoverable`, sin segunda autorización.
+  **Hallazgo de código, no de test:** verifiqué en `demoProvider.ts` + `paymentService.ts:452-460`
+  que la fila 4 de "Probar desde la UI" (pago aprobado justo antes de vencer, vía el botón) **no
+  se puede reproducir a mano con el proveedor DEMO** — cualquier acción pública que aprueba un
+  pago (`/simulate approve`) dispara `processApproval` en el mismo request, así que la sesión
+  nunca queda `PAYMENT_EXPIRED` esperando el click. Es la misma limitación que ya documentaba la
+  guía para el "Caso 1 de verdad" (terminal), solo que no estaba anotada también en la fila 4 de
+  la tabla UI. Cubierto por `apps/api/tests/reconciliation.test.ts:171-188` (manipula el provider
+  directo en memoria, sin pasar por HTTP) — puerta (a) verde para ese camino.
+  Veredicto humano confirmado por Pablo en `qa/FASE-1-manual.md`. Puertas (a)+(b)+(c) de FASE-1
+  verdes. Actualizados `pendientes-manual.md` (A4b ✅), `ESTADO.md` y el storyline
+  (`redessociales-hidro-self-service.md`).
