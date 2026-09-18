@@ -913,3 +913,18 @@
   anterior, porque ya no hay archivo en claro que releer). Ambas quedaron escritas en C4 de
   `pendientes-manual.md` y en `.env.example`. **118/118 tests verdes** (5 nuevos en
   `apps/api/tests/demo-mode.test.ts`). No se tocó `firmware/`.
+
+- **2026-09-18 (ADR-049). El MODO DEMO quedó corriendo en producción: verificado en vivo, no por
+  deducción.** Pablo cargó `DEVICE_SIMULATOR=true` en Coolify y pidió el push; el deploy
+  automático tardó ~90 s. Detalle que vale para la próxima: **el redeploy que hizo ANTES del push
+  no cambió nada**, porque corría todavía el código viejo donde el `!isProd` se comía la variable
+  — la env var y el código tienen que viajar juntos. Verificado contra
+  `hidro-api.insolvadev.com` (no contra local): `simulatedDevice: true`, HIDRO-01 ONLINE /
+  AVAILABLE, y el flujo completo corrido por HTTP con una patente de prueba (`ZZ999ZZ`, externo
+  $8.000, elegida para no gastarle el cupo diario a ninguna patente real): pago demo aprobado →
+  autorización tomada por el ESP32 simulado → pulsador → **RELAY ON** → RUNNING → **cortó solo a
+  los 180 s** → máquina AVAILABLE otra vez con el relay apagado. Es la primera vez que el ciclo
+  entero corre en el servidor de producción; hasta hoy solo había corrido en tests y en dev.
+  Nota operativa: mientras corre un lavado simulado la máquina queda **BUSY 180 s reales**
+  (`TEST_SPEED_FACTOR` se fuerza a 1 en producción), así que una prueba propia le tapa la pantalla
+  al dueño por 3 minutos. Sigue vigente lo del ADR-048: apagar la variable antes de D1.

@@ -246,16 +246,14 @@ preguntarte de nuevo):
   servicios (las cámaras, por ejemplo) usan `http://`. Es tu decisión porque toca la
   infraestructura compartida.
 
-- [ ] **C4. Prender el MODO DEMO en Coolify (decidido: opción (a) del ADR-047; código listo,
-  ADR-048).** El sistema ya sabe hacer la simulación en producción; falta una sola cosa que solo
-  podés hacer vos, porque es en el panel de Coolify:
-  1. Coolify → la app de hidro → **Environment Variables** → agregar `DEVICE_SIMULATOR` = `true`.
-  2. Redeploy (o esperar al deploy automático del próximo push a `main`, ~2 min).
-  3. Entrar a `https://hidro-api.insolvadev.com/`: tiene que aparecer un cartel amarillo
-     **"MODO DEMO — MÁQUINA SIMULADA"** y HIDRO-01 en **Disponible**. Si sigue "fuera de
-     servicio", la variable no quedó guardada o el deploy no terminó.
-  4. Pasale el link al dueño. Puede recorrer todo: patente → tarifa → pagar (pago de mentira) →
-     botón "APRETAR EL PULSADOR SIMULADO" → los 180 s corriendo.
+- [x] **C4. HECHO el 2026-09-18 — MODO DEMO prendido y verificado en producción** (opción (a) del
+  ADR-047; código en ADR-048, confirmación en ADR-049). Pablo cargó `DEVICE_SIMULATOR=true` en
+  Coolify y el deploy quedó arriba. Verificado contra `hidro-api.insolvadev.com`: HIDRO-01
+  **ONLINE / Disponible** con cartel "MODO DEMO — MÁQUINA SIMULADA", y el flujo entero corrido de
+  punta a punta (cotizar → pago demo aprobado → autorización tomada por el simulado → pulsador →
+  RELAY ON → RUNNING → cortó solo a los 180 s → máquina libre, relay apagado).
+  **Ya se le puede pasar el link al dueño.** Recorre todo: patente → tarifa → pagar (pago de
+  mentira) → botón "APRETAR EL PULSADOR SIMULADO" → los 180 s corriendo.
   **Para que vea las tres tarifas** tiene que haber patentes cargadas: entrá a `/admin` →
   Vehículos y registrá una como `remis` y otra como `socio` (con su PIN). Cualquier patente que
   no esté cargada cotiza como externo ($8.000) — eso es lo correcto, no un error.

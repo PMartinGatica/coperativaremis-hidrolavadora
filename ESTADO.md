@@ -7,13 +7,13 @@
 
 1. Cargá SOLO este `ESTADO.md` + `CLAUDE.md` del Mundo. `export GSTACK_PROJECT_SLUG=
    PMartinGatica-hidro-self-service` antes de la primera skill de gstack.
-2. **Lo primero: preguntarle a Pablo si prendió `DEVICE_SIMULATOR=true` en Coolify** (paso C4 de
-   `pendientes-manual.md`). El código del MODO DEMO ya está hecho y mergeado (ADR-048, resuelve el
-   ADR-047 por la opción (a)): con esa variable prendida, su cliente entra a
-   `https://hidro-api.insolvadev.com/`, ve HIDRO-01 **Disponible** con un cartel amarillo "MODO
-   DEMO — MÁQUINA SIMULADA", y recorre todo el flujo (patente → tarifa → pago falso → pulsador
-   simulado → 180 s) sin ESP32. Es lo único que faltaba para que el dueño pueda pulir la interfaz.
-   Si ya lo probó, lo que sigue es escuchar su feedback de interfaz y anotarlo.
+2. **MODO DEMO PRENDIDO Y VERIFICADO EN PRODUCCIÓN** (ADR-048/049, cierra el ADR-047 por la
+   opción (a)). Pablo cargó `DEVICE_SIMULATOR=true` en Coolify y el deploy quedó arriba el
+   2026-09-18: `hidro-api.insolvadev.com` muestra HIDRO-01 **Disponible** con cartel "MODO DEMO —
+   MÁQUINA SIMULADA" y el flujo entero corre (cotizar → pago demo → autorización → pulsador
+   simulado → RELAY ON → 180 s → corta solo → máquina libre). **Lo que sigue: escuchar el feedback
+   de interfaz del dueño y anotarlo** — para eso se hizo. Para que vea las 3 tarifas hay que
+   registrar patentes remis/socio desde `/admin`; sin registrar, todo cotiza externo $8.000.
 3. **Fase 1 cerrada del todo** (ADR-044) y A3 cerrado con bug real arreglado (ADR-045). No hay
    pendientes de código de Fase 1.
 4. **Compra del hardware armada** (ADR-046): caja metálica → ESP32-**WROOM-32U** con antena
@@ -42,6 +42,6 @@ Firmware compila, nunca corrió en hardware real. Fase de cadencia: 1 (manual).
 
 ## Pendientes humanos
 
-Ver `pendientes-manual.md`. Parte A cerrada. B0 mandado; falta confirmar B1/B2. **C4 = prender la
-variable en Coolify** (lo único que separa al dueño de ver la demo). D = banco (D0) y hardware
-(D1), esperando piezas.
+Ver `pendientes-manual.md`. Parte A cerrada. B0 mandado; falta confirmar B1/B2. **C4 HECHO**
+(variable prendida y verificada en producción el 2026-09-18). D = banco (D0) y hardware (D1),
+esperando piezas.
