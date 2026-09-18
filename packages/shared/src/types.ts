@@ -271,6 +271,9 @@ export interface PublicMachineInfo {
   currentSessionId: string | null;
   currentSessionStatus: SessionStatus | null;
   demoMode: boolean;
+  /** true = no hay ESP32 físico: los heartbeats los manda el simulador in-process (ADR-047).
+   *  La UI lo usa para avisar que nada de lo que se ve enciende una hidrolavadora real. */
+  simulatedDevice: boolean;
 }
 
 export interface SessionTimelineEvent {

@@ -7,11 +7,9 @@
 >
 > Última actualización: 2026-09-18. **TODA LA PARTE A ESTÁ HECHA.** Fase 1 cerrada del todo
 > (A4b, ADR-044) y A3 cerrado encontrando y arreglando un bug real de rate-limit por IP
-> (ADR-045). **Lo que sigue es la Parte B**, y adentro de la Parte B lo más urgente es **B0**:
-> mandarle a Gaby la lista de compras del ESP32 (`mensajes/mensaje-compras-gaby.md`), porque
-> una de las placas figuraba como última unidad y sin placa no hay banco de pruebas. La compra
-> se armó el 2026-09-18 verificando los links uno por uno: apareció que la caja de la máquina es
-> **metálica**, así que el ESP32 pasó a ser el modelo **WROOM-32U** con antena externa (ADR-046).
+> (ADR-045). **B0 ya mandado** (compras a Gaby). Falta confirmar B1/B2. **C4 decidido y
+> construido** (ADR-047 → ADR-048): el modo demo existe; te queda prender `DEVICE_SIMULATOR=true`
+> en Coolify para que el dueño pueda recorrer la interfaz sin ESP32.
 > ⚠️ Coolify despliega solo cada vez que se sube código a `main` (tarda ~2 minutos). El ítem de
 > ADR-007 (patente) se sacó: lo resolvió el PIN (ADR-036).
 
@@ -247,6 +245,26 @@ preguntarte de nuevo):
   Use HTTPS"). **No actives "Always Use HTTPS" para toda la zona** sin revisar antes qué otros
   servicios (las cámaras, por ejemplo) usan `http://`. Es tu decisión porque toca la
   infraestructura compartida.
+
+- [ ] **C4. Prender el MODO DEMO en Coolify (decidido: opción (a) del ADR-047; código listo,
+  ADR-048).** El sistema ya sabe hacer la simulación en producción; falta una sola cosa que solo
+  podés hacer vos, porque es en el panel de Coolify:
+  1. Coolify → la app de hidro → **Environment Variables** → agregar `DEVICE_SIMULATOR` = `true`.
+  2. Redeploy (o esperar al deploy automático del próximo push a `main`, ~2 min).
+  3. Entrar a `https://hidro-api.insolvadev.com/`: tiene que aparecer un cartel amarillo
+     **"MODO DEMO — MÁQUINA SIMULADA"** y HIDRO-01 en **Disponible**. Si sigue "fuera de
+     servicio", la variable no quedó guardada o el deploy no terminó.
+  4. Pasale el link al dueño. Puede recorrer todo: patente → tarifa → pagar (pago de mentira) →
+     botón "APRETAR EL PULSADOR SIMULADO" → los 180 s corriendo.
+  **Para que vea las tres tarifas** tiene que haber patentes cargadas: entrá a `/admin` →
+  Vehículos y registrá una como `remis` y otra como `socio` (con su PIN). Cualquier patente que
+  no esté cargada cotiza como externo ($8.000) — eso es lo correcto, no un error.
+  ⚠️ **Apagar la variable (o ponerla en `false`) antes de conectar el ESP32 de verdad (D1)**, si
+  no vas a tener una máquina fantasma mandando heartbeats falsos al lado de la real. Ojo también:
+  con el simulador prendido, **rotar el secret de un dispositivo desde el admin no tiene efecto
+  hasta reiniciar la app**. Y si algún día cargás las credenciales reales de Mercado Pago sin
+  apagar esta variable, **la API no arranca a propósito** y el log dice exactamente eso: es la
+  red que evita cobrarle a un cliente por una máquina que no existe.
 
 ## PARTE D — Fuera de lo que se puede resolver desde una compu
 

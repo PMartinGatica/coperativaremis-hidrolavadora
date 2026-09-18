@@ -107,6 +107,24 @@ export function EmptyState({ icon, title, sub }: { icon: ReactNode; title: strin
   );
 }
 
+/** Aviso grande y difícil de ignorar: lo que se ve NO es una máquina real (ADR-047).
+ *  Se muestra cuando la API informa `simulatedDevice`, o sea DEVICE_SIMULATOR=true. */
+export function SimulationBanner({ children }: { children?: ReactNode }) {
+  return (
+    <div className="rounded-xl border border-warn/40 bg-warn/10 p-3 text-left">
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-warn">
+        <span className="led led-warn" />
+        Modo demo — máquina simulada
+      </div>
+      <p className="mt-1.5 text-[0.72rem] leading-relaxed text-dim">
+        No hay una hidrolavadora conectada: el cobro es de mentira y no se enciende ningún motor.
+        Esta pantalla es para ver y ajustar cómo queda el sistema.
+      </p>
+      {children}
+    </div>
+  );
+}
+
 export function DemoBanner({ text = 'DEMO MODE — sin credenciales de Mercado Pago ni ESP32 físico' }: { text?: string }) {
   return (
     <div className="flex items-center gap-2 rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-xs font-medium tracking-wide text-warn">

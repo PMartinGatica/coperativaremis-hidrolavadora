@@ -103,6 +103,13 @@ export function assertProductionConfig(config: AppConfig): void {
   if (adminPassword === DEMO_ADMIN_PASSWORD || adminPassword.length < MIN_ADMIN_PASSWORD_LENGTH) {
     problems.push(`ADMIN_PASSWORD es la clave demo o tiene menos de ${MIN_ADMIN_PASSWORD_LENGTH} caracteres`);
   }
+  // Simulador + plata real = cobrarle a alguien por una máquina que no existe. La API no
+  // arranca: es la única combinación de la demo (ADR-047) que puede sacarle dinero a un cliente.
+  if (config.deviceSimulator && config.paymentProvider === 'mercadopago') {
+    problems.push(
+      'DEVICE_SIMULATOR=true con PAYMENT_PROVIDER=mercadopago: el simulador solo puede convivir con pagos DEMO (apagar DEVICE_SIMULATOR antes de cobrar de verdad)',
+    );
+  }
   if (problems.length > 0) {
     throw new Error(`Configuración de producción inválida:\n- ${problems.join('\n- ')}`);
   }
@@ -164,7 +171,10 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     // Normalizado a minúsculas: el login compara lowercase (evita lockout por mayúsculas).
     adminEmail: str(process.env.ADMIN_EMAIL, 'admin@hidro.local').toLowerCase().trim(),
     adminPassword: str(process.env.ADMIN_PASSWORD, DEMO_ADMIN_PASSWORD),
-    deviceSimulator: !isProd && bool(process.env.DEVICE_SIMULATOR, true),
+    // Default: ON en dev/test, OFF en producción. En producción se prende SOLO con
+    // DEVICE_SIMULATOR=true explícito (modo demo del ADR-047) y con pagos DEMO:
+    // assertProductionConfig() rechaza simulador + Mercado Pago real.
+    deviceSimulator: bool(process.env.DEVICE_SIMULATOR, !isProd),
     testSpeedFactor: speed,
     heartbeatIntervalMs: num(process.env.HEARTBEAT_INTERVAL_MS, DEFAULT_HEARTBEAT_INTERVAL_MS),
     deviceOnlineThresholdMs: num(process.env.DEVICE_ONLINE_THRESHOLD_MS, DEVICE_ONLINE_THRESHOLD_MS),

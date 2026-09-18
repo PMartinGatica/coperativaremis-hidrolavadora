@@ -1,7 +1,7 @@
 import { AppError, type SimulatorAction, type SimulatorSnapshot } from '@hidro/shared';
 import type { AppContext } from '../context.js';
 import { getDeviceByMachine, listMachines } from '../repositories/repos.js';
-import { loadDeviceSecret } from '../db/seed.js';
+import { decryptSecret, loadDeviceSecret } from '../db/seed.js';
 import { SimDevice } from './simDevice.js';
 import { createLogger } from '../logger.js';
 
@@ -22,7 +22,12 @@ export class SimulatorHub {
     for (const m of machines) {
       const device = await getDeviceByMachine(this.ctx.db, m.id);
       if (!device) continue;
-      const secret = await loadDeviceSecret(m.id, this.ctx.config.dataDir);
+      // devices.json (texto plano) solo existe fuera de producción. En el modo demo de
+      // producción (ADR-047) el device ya está sembrado hace tiempo, así que el secret se
+      // descifra de la base con DEVICE_AUTH_SECRET y nunca toca el disco.
+      const secret =
+        (await loadDeviceSecret(m.id, this.ctx.config.dataDir)) ??
+        decryptSecret(device.secretEnc, this.ctx.config.deviceAuthSecret);
       if (!secret) {
         log.warn('simulador sin secret de dispositivo', { machineId: m.id });
         continue;

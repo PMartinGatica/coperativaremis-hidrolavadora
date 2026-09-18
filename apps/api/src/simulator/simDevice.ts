@@ -222,7 +222,7 @@ export class SimDevice {
     try {
       const device = await this.deviceRow();
       if (!device) return;
-      const { authorization } = await getAuthorizationForDevice(this.ctx, device);
+      const { authorization } = await getAuthorizationForDevice(this.ctx, device, { simulated: true });
       if (authorization && authorization.status === 'AUTHORIZED') {
         this.auth = {
           authorizationId: authorization.authorization_id,

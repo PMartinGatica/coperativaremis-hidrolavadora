@@ -481,10 +481,11 @@ export async function rotateDeviceSecret(deps: AdminDeps, machineId: string, act
   if (!device) throw new AppError('DEVICE_NOT_FOUND', `Sin dispositivo registrado para ${machineId}`);
   const secret = newDeviceSecret();
   await updateDevice(deps.db, device.id, { secretEnc: encryptSecret(secret, deps.config.deviceAuthSecret) });
-  // El archivo en claro SOLO existe en DEMO MODE (lo consume el simulador).
+  // El archivo en claro SOLO existe en DEMO MODE fuera de producción (lo consume el simulador).
   // En producción el secret viaja únicamente en la respuesta de este endpoint
-  // (se muestra UNA vez, para flashear el ESP32).
-  if (deps.config.deviceSimulator) {
+  // (se muestra UNA vez, para flashear el ESP32). Con el simulador de demo prendido en
+  // producción (ADR-047), rotar exige reiniciar la app: el SimDevice sigue con el anterior.
+  if (deps.config.deviceSimulator && deps.config.nodeEnv !== 'production') {
     await updateDeviceSecretFile(machineId, secret, deps.config.dataDir);
   }
   await insertAudit(deps.db, {

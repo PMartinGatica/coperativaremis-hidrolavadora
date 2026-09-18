@@ -236,11 +236,12 @@ export async function runSeed(db: Db, config: AppConfig): Promise<SeedResult> {
     }
   }
 
-  // Persiste los secrets de dispositivos en texto plano SOLO cuando corre el
-  // SIMULADOR (DEMO MODE). En producción los secrets viajan únicamente al ESP32
-  // en el momento del flashing (la respuesta de "Rotar secret" los muestra una vez).
+  // Persiste los secrets de dispositivos en texto plano SOLO cuando corre el SIMULADOR
+  // (DEMO MODE) y FUERA de producción. En producción los secrets viajan únicamente al ESP32
+  // en el momento del flashing (la respuesta de "Rotar secret" los muestra una vez); si ahí
+  // corre el simulador de demo (ADR-047), lee el secret descifrando la base, no el disco.
   const devicesFile = path.resolve(config.dataDir, 'devices.json');
-  if (config.deviceSimulator) {
+  if (config.deviceSimulator && config.nodeEnv !== 'production') {
     let stored: Record<string, string> = {};
     if (fs.existsSync(devicesFile)) {
       try {

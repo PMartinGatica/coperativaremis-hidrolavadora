@@ -33,6 +33,11 @@ export async function createContext(overrides: Partial<AppConfig> = {}): Promise
       'PAYMENT_PROVIDER=demo en producción: los dispositivos no reciben autorizaciones (ALLOW_DEMO_PAYMENTS_ON_DEVICE=true solo para la prueba en banco)',
     );
   }
+  if (config.nodeEnv === 'production' && config.deviceSimulator) {
+    logger.warn(
+      'MODO DEMO EN PRODUCCIÓN (ADR-047): DEVICE_SIMULATOR=true — las máquinas se ven ONLINE por un ESP32 simulado, no por hardware real. Apagar esta variable ANTES de conectar el ESP32 de verdad.',
+    );
+  }
 
   const ctx: AppContext = {
     config,

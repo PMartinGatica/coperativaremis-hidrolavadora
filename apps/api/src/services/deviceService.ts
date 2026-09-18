@@ -43,7 +43,12 @@ export interface DeviceDeps {
 const lastPersistedEvent = new Map<string, Date>(); // machineId -> última inserción de heartbeat
 
 // Un pago DEMO se aprueba desde un endpoint público: entregarlo a un ESP32 real regalaría lavados.
-export function isDemoAuthorizationWithheld(config: AppConfig): boolean {
+// `simulated` = la llamada viene del SimDevice in-process (nunca de la ruta HTTP con HMAC, que es
+// el único camino de un ESP32 físico). Un dispositivo simulado no mueve un motor ni abre agua:
+// no hay lavado que regalar, y sin esto el modo demo de producción (ADR-047) se cuelga para
+// siempre en "esperando pulsador".
+export function isDemoAuthorizationWithheld(config: AppConfig, opts: { simulated?: boolean } = {}): boolean {
+  if (opts.simulated) return false;
   return config.nodeEnv === 'production' && config.paymentProvider === 'demo' && !config.allowDemoPaymentsOnDevice;
 }
 
@@ -115,12 +120,17 @@ export async function registerHeartbeat(deps: DeviceDeps, device: DeviceRow, pay
   };
 }
 
-/** GET /api/device/authorization — el ESP32 pregunta si tiene autorización pendiente. */
-export async function getAuthorizationForDevice(deps: DeviceDeps, device: DeviceRow): Promise<{ authorization: AuthorizationDto | null; server_time: number }> {
+/** GET /api/device/authorization — el ESP32 pregunta si tiene autorización pendiente.
+ *  `opts.simulated` lo pasa SOLO el SimDevice in-process; la ruta HTTP nunca lo setea. */
+export async function getAuthorizationForDevice(
+  deps: DeviceDeps,
+  device: DeviceRow,
+  opts: { simulated?: boolean } = {},
+): Promise<{ authorization: AuthorizationDto | null; server_time: number }> {
   const { db } = deps;
   const now = new Date();
   const auth = await getActiveAuthorizationForMachine(db, device.machineId, now);
-  if (!auth || isDemoAuthorizationWithheld(deps.config)) {
+  if (!auth || isDemoAuthorizationWithheld(deps.config, opts)) {
     return { authorization: null, server_time: now.getTime() };
   }
   const session = await getSession(db, auth.sessionId);

@@ -848,3 +848,68 @@
   **Riesgo eléctrico nuevo, derivado de la caja metálica:** caja de metal + agua en el taller +
   contactor de 220 V ⇒ la caja tiene que ir **puesta a tierra**. Es trabajo de los técnicos, ya
   agregado por escrito al mensaje que se les manda.
+
+- **2026-09-18 (ADR-047). Por qué el dueño no puede "ver la simulación" entrando al link público
+  — causa raíz encontrada, decisión pendiente (NO resuelto todavía).** Pablo probó
+  `https://hidro-api.insolvadev.com/` en producción para que su cliente (el dueño de la
+  cooperativa) fuera puliendo la interfaz sin esperar al hardware. Resultado: elige HIDRO-01 y
+  cae en la pantalla de "fuera de servicio" — no deja cargar patente ni PIN, no llega nunca a la
+  pantalla de pago.
+  **Causa raíz (confirmada leyendo código, no es un bug):** `machineService.ts` calcula el estado
+  de la máquina a partir del último heartbeat de un dispositivo físico
+  (`DEVICE_ONLINE_THRESHOLD_MS`; sin heartbeat reciente → `OFFLINE` → `OUT_OF_SERVICE` de cara al
+  público, línea ~43-58) y la creación de sesión de pago rechaza con `MACHINE_OFFLINE` si la
+  máquina no está online (línea ~172). En **dev local** esto no se nota porque
+  `config.ts:167` prende un simulador de dispositivo **in-process**
+  (`apps/api/src/simulator/simDevice.ts`, el mismo que usan los 48 tests) que manda heartbeats
+  falsos dentro del mismo proceso del servidor. En **producción ese simulador está apagado por
+  diseño, sin importar ninguna env var**: `deviceSimulator: !isProd && bool(...)` — el `!isProd`
+  gana siempre. Por eso `npm run dev` de Pablo muestra la app completa y la URL pública de
+  producción, sin un ESP32 real conectado, nunca puede pasar de "fuera de servicio". No es un
+  bug de seguridad ni de código: es la misma protección que evita que producción mienta con
+  datos falsos si alguien se olvida una env var prendida.
+  **No se decidió todavía cómo resolverlo — opciones sobre la mesa para la próxima sesión:**
+  (a) habilitar el simulador en producción detrás de una env var explícita (sacar el `!isProd &&`
+  y depender solo de la variable), con un banner "MODO DEMO" bien visible en la UI mientras esté
+  prendido, apagarlo antes de operar de verdad; (b) un ambiente/subdominio de demo aparte
+  (otra app en Coolify) con el simulador prendido, sin tocar el `hidro-api.insolvadev.com` real;
+  (c) esperar a D0/D1 (banco armado con el ESP32 real) y mostrarle al dueño el flujo con hardware
+  de verdad en vez de una simulación. Sin decidir todavía cuál — es la primera cosa a resolver la
+  próxima sesión.
+
+- **2026-09-18 (ADR-048). Se resuelve el ADR-047: MODO DEMO en producción detrás de
+  `DEVICE_SIMULATOR`, elegida la opción (a).** Pablo eligió (a) sobre (b) subdominio aparte y (c)
+  esperar al hardware: su cliente quiere pulir la interfaz ahora, producción todavía no tiene nada
+  real que proteger (pagos en modo DEMO, cero hardware conectado), y un segundo ambiente en
+  Coolify costaba app + DNS + túnel + otra base para aislar algo que hoy no existe.
+  **Al construirlo aparecieron dos bloqueos más que el ADR-047 no había visto**, y que hacían que
+  la solución "obvia" (sacar el `!isProd &&` de `config.ts`) no alcanzara:
+  1. **El simulador no tenía con qué autenticarse.** `hub.ts` levantaba el secret del dispositivo
+     desde `devices.json`, y ese archivo **solo se escribe cuando el device se siembra por primera
+     vez** (`seed.ts`). En producción HIDRO-01 existe hace semanas: el archivo no está y nunca se
+     iba a escribir, así que el hub habría salteado la máquina y todo habría seguido igual de
+     "fuera de servicio". Ahora el hub cae a **descifrar el secret de la base** con
+     `DEVICE_AUTH_SECRET` (`decryptSecret`), que además es mejor que la alternativa: el secret en
+     claro **ya no se escribe nunca al volumen en producción** (seed y "rotar secret" quedaron
+     restringidos a no-producción).
+  2. **La autorización no le llegaba a ningún dispositivo.** `isDemoAuthorizationWithheld()`
+     retiene las autorizaciones en producción+pagos DEMO (ADR-039) para que nadie regale lavados
+     aprobando pagos falsos. Con eso, el flujo demo se colgaba para siempre en "esperando
+     pulsador". Se agregó un parámetro `{ simulated: true }` que **solo** puede pasar el SimDevice
+     in-process: un ESP32 físico entra por la ruta HTTP con HMAC, que nunca lo setea. Un
+     dispositivo simulado no mueve un motor, así que no hay lavado que regalar; la guarda para
+     hardware real queda intacta (hay un test que lo prueba en el mismo instante y con la misma
+     autorización viva).
+  **Guardas nuevas:** (i) `assertProductionConfig` **rechaza el arranque** si conviven
+  `DEVICE_SIMULATOR=true` y `PAYMENT_PROVIDER=mercadopago` — la única combinación que podía
+  cobrarle plata real a un cliente por una máquina inexistente; falla en el deploy, no en
+  producción viva. (ii) Warning ruidoso al arrancar. (iii) La API publica `simulatedDevice` y la
+  web muestra un cartel "MODO DEMO — MÁQUINA SIMULADA" en la landing y en la pantalla de la
+  máquina, más el atajo al pulsador simulado. El default no cambió para nadie: sigue apagado en
+  producción salvo variable explícita.
+  **Consecuencias:** hay que apagar la variable antes de conectar el ESP32 real (D1) o van a
+  convivir una máquina fantasma y una real; y con el simulador prendido en producción, rotar el
+  secret desde el admin recién tiene efecto al reiniciar la app (el SimDevice conserva el
+  anterior, porque ya no hay archivo en claro que releer). Ambas quedaron escritas en C4 de
+  `pendientes-manual.md` y en `.env.example`. **118/118 tests verdes** (5 nuevos en
+  `apps/api/tests/demo-mode.test.ts`). No se tocó `firmware/`.

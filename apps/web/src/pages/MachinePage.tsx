@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowRight, Car, Check, CircleAlert, Droplets, Radio, RotateCcw, Zap } from 'lucide-react';
+import { ArrowRight, Car, Check, CircleAlert, Cpu, Droplets, Radio, RotateCcw, Zap } from 'lucide-react';
 import { PLATE_CATEGORY_LABELS, type CheckoutResponse, type PlateQuote, type PublicMachineInfo, type PublicSessionState, type SessionStatus } from '@hidro/shared';
 import { api, ApiError } from '../api/client.js';
 import { usePolling, useNow } from '../lib/usePolling.js';
 import { formatArs, formatClock, formatMinutes, timeAgo } from '../lib/format.js';
-import { AvailabilityBadge, DemoBanner, Led } from '../components/ui.js';
+import { AvailabilityBadge, Led, SimulationBanner } from '../components/ui.js';
 
 interface Step {
   id: string;
@@ -197,6 +197,14 @@ export default function MachinePage() {
         </div>
       ) : (
         <main className="stagger flex flex-col gap-3">
+          {machine.simulatedDevice ? (
+            <SimulationBanner>
+              <Link to="/demo/device" className="btn btn-ghost mt-2.5 w-full py-2 text-[0.7rem]">
+                <Cpu size={13} /> ABRIR LA MÁQUINA SIMULADA (PULSADOR)
+              </Link>
+            </SimulationBanner>
+          ) : null}
+
           {/* tarjeta de máquina */}
           <section className="card p-5">
             <div className="flex items-start justify-between gap-3">
@@ -380,10 +388,14 @@ function FlowStage({
               />
             </div>
 
-            {import.meta.env.DEV && machine.demoMode ? (
-              <div className="mt-2 text-[0.68rem] text-faint">
-                DEMO: probá con <span className="num text-aqua">AE100AA</span> (remis),{' '}
-                <span className="num text-aqua">AE200AA</span> (socio) o cualquier otra (externo).
+            {machine.simulatedDevice ? (
+              <div className="mt-2 text-[0.68rem] leading-relaxed text-faint">
+                Una patente que no esté cargada en el panel cotiza como <span className="text-ink">externo</span>.
+                Para ver las tarifas de remis y socio, registrala antes desde{' '}
+                <Link to="/admin" className="text-aqua underline decoration-aqua/40">
+                  el panel de administración
+                </Link>
+                .
               </div>
             ) : null}
 
@@ -545,6 +557,11 @@ function FlowStage({
         <p className="mt-2 text-sm leading-relaxed text-dim">
           Presioná el <span className="text-ink">botón físico</span> de la hidrolavadora para comenzar el lavado.
         </p>
+        {machine.simulatedDevice ? (
+          <Link to="/demo/device" className="btn btn-ghost mt-3 w-full py-2.5 text-[0.7rem]">
+            <Cpu size={13} /> MODO DEMO: APRETAR EL PULSADOR SIMULADO
+          </Link>
+        ) : null}
         {plateChip}
         {authRemaining !== null ? (
           <div className="mt-5">

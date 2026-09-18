@@ -81,6 +81,7 @@ export async function getPublicMachineInfo(deps: MachineDeps, machineId: string)
     currentSessionId: active?.id ?? null,
     currentSessionStatus: active?.status ?? null,
     demoMode: deps.config.paymentProvider === 'demo',
+    simulatedDevice: deps.config.deviceSimulator,
   };
 }
 
@@ -98,6 +99,7 @@ export async function listPublicMachines(deps: MachineDeps) {
       durationSeconds: m.durationSeconds,
       availability: deriveAvailability(m, active !== null),
       demoMode: deps.config.paymentProvider === 'demo',
+      simulatedDevice: deps.config.deviceSimulator,
     });
   }
   return result;
