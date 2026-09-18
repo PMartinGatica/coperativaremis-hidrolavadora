@@ -111,20 +111,23 @@ confirmar que tu clave funciona (yo no puedo probar eso desde afuera). Si algo f
 de prueba, hiciste Redeploy y confirmaste que persiste y que las demo no vuelven. El volumen
 persistente queda validado en producción real, no solo en el test local. Nada más que hacer acá.
 
-### 👉 A3. Chequear que el sistema ve la IP real del cliente (importante para no dejar gente sin poder pagar) — seguí por acá
+### ✅ A3. Chequear que el sistema ve la IP real del cliente — HECHO, encontrado y arreglado un bug real
 
-Hay 3 "capas" delante de tu app (Cloudflare → túnel → Traefik) y necesitamos que el sistema sepa
-la IP real de cada visitante, no la de esas capas — si no, puede llegar a agrupar a TODOS los
-clientes bajo una sola cuota y el primero que pague deja a los demás sin poder.
+**Corrido con vos el 2026-09-18 (ADR-045).** Probamos con tu wifi de casa y con los datos
+móviles de tu celular, comparando el contador de rate-limit del login de admin: el número
+siguió bajando de una red a la otra en vez de resetear — las dos IPs reales caían en el MISMO
+balde. Confirmado: `TRUST_PROXY=1` no alcanza con las 2 capas intermedias que hay en producción
+(túnel de Cloudflare + Traefik). Arreglado sin tocar esa variable: ahora se lee directo el header
+`CF-Connecting-IP` que pone Cloudflare (no se puede falsificar, tu servidor no tiene IP pública
+propia expuesta). Ya en `main`, tests 113/113 OK.
 
-1. Con la app ya desplegada (A1 hecho), hacé un pago de prueba o cualquier request desde tu
-   celular con datos móviles (no wifi de tu casa/oficina, para que sea una IP pública distinta).
-2. Pedime que te ayude a revisar los logs del contenedor en Coolify — ahí vas a ver qué IP quedó
-   registrada.
-3. Comparala con tu IP pública real (buscá "cuál es mi ip" en Google desde el mismo celular).
-   - Si coinciden → todo bien, no toques nada.
-   - Si NO coinciden → avisame, hay que ajustar `TRUST_PROXY` (o cambiar a leer el header
-     `CF-Connecting-IP`, que Cloudflare no deja falsificar).
+**Discutimos el impacto antes de tocar código:** con una sola máquina esto casi no afecta a
+clientes reales (el "máquina ocupada" ya los serializa por lógica de negocio) — pero sí iba a
+importar el día que agregues HIDRO-02, donde dos clientes en máquinas distintas podrían
+compartir cupo sin motivo. Por eso se arregló ahora que ya estaba diagnosticado.
+
+**Falta:** confirmar en producción después del redeploy, repitiendo el mismo test (wifi vs.
+datos móviles) — esta vez el contador debería resetear en vez de seguir bajando.
 
 ### ✅ A4. Prueba de "pago que se recupera solo" — HECHO
 

@@ -789,3 +789,30 @@
   Veredicto humano confirmado por Pablo en `qa/FASE-1-manual.md`. Puertas (a)+(b)+(c) de FASE-1
   verdes. Actualizados `pendientes-manual.md` (A4b ✅), `ESTADO.md` y el storyline
   (`redessociales-hidro-self-service.md`).
+- **2026-09-18 (ADR-045). A3 corrido con Pablo — encontrado y arreglado bug real de rate-limit
+  por IP compartida detrás del túnel de Cloudflare.** Test en vivo: 2 requests al login de admin
+  (credenciales incorrectas a propósito) desde 2 redes reales distintas (wifi domiciliaria y
+  datos móviles del celular), comparando el header `ratelimit` (formato draft-8:
+  `"10-in-15min"; r=N`). Resultado: el contador siguió bajando de una red a la otra (6→5) en vez
+  de resetear — las dos IPs reales caían en el MISMO balde. Causa: `TRUST_PROXY=1` (default de
+  `infrastructure/DEPLOY.md`) solo confía 1 salto de `X-Forwarded-For`, pero producción tiene 2
+  capas intermedias (túnel de Cloudflare + Traefik dentro de Coolify) — con 1 solo salto
+  confiado, `req.ip` termina siendo la IP de una de esas capas internas (fija, igual para
+  cualquier visitante real), no la del cliente.
+  **Discutido el impacto real con Pablo antes de arreglar:** con una sola máquina, el
+  `machine_occupied` ya serializa el uso por lógica de negocio (no hace falta el rate limit para
+  eso) — el bug importa poco hoy, pero sí el día que se agregue una segunda máquina (HIDRO-02):
+  ahí dos clientes reales en máquinas DISTINTAS podrían compartir cupo sin motivo de negocio.
+  Se decidió arreglarlo ahora que ya estaba diagnosticado, en vez de esperar.
+  **Arreglo (sin tocar `TRUST_PROXY`, más robusto que contar saltos):** nueva función
+  `clientIp()` en `apps/api/src/http/middleware.ts` que lee `CF-Connecting-IP` (Cloudflare lo
+  pone en su edge con la IP real; no se puede falsificar porque el origen solo es alcanzable a
+  través del túnel, sin IP pública propia expuesta) y cae a `req.ip` si el header no está
+  (local/tests, sin cambio de comportamiento ahí). Aplicado como `keyGenerator` en los 4
+  limitadores que dependían de IP: `createGlobalRateLimit`, `createPaymentCreationRateLimit`,
+  `createAdminLoginRateLimit`, `createSimulateRateLimit`. `createPinAttemptRateLimit` queda
+  igual (ya era por patente, no por IP — decisión previa, ADR del Eng review de
+  `pin-patente-remis-socio.md`). Build limpio, 113/113 tests OK (sin cambios de comportamiento
+  en tests: sin el header, cae al mismo `req.ip` de siempre). Pendiente: re-confirmar en
+  producción tras el deploy repitiendo el mismo test de las 2 redes (debería resetear en vez de
+  seguir bajando).

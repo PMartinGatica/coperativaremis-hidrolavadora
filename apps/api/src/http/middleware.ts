@@ -54,6 +54,20 @@ export function notFoundHandler(_req: Request, res: Response): void {
   res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Ruta no encontrada.' } });
 }
 
+/** IP real del visitante. En producción hay 2 capas delante de la app (túnel de Cloudflare +
+ *  Traefik dentro de Coolify) y `TRUST_PROXY` (saltos de `X-Forwarded-For` a confiar) es frágil
+ *  de calibrar a mano — un valor de menos hace que TODOS los visitantes reales compartan la IP
+ *  de una de esas capas internas, agrupando su cupo de rate-limit (hallazgo A3, 2026-09-17:
+ *  confirmado en vivo que dos redes reales distintas -wifi y datos móviles- caían en el mismo
+ *  balde). `CF-Connecting-IP` es más confiable: Cloudflare lo pone en su edge con la IP real y
+ *  no se puede falsificar porque el origen solo es alcanzable a través del túnel (sin IP pública
+ *  propia expuesta). En local/tests, sin ese header, cae al `req.ip` de siempre. */
+export function clientIp(req: Request): string {
+  const cf = req.headers['cf-connecting-ip'];
+  if (typeof cf === 'string' && cf.length > 0) return cf;
+  return req.ip ?? 'unknown';
+}
+
 // IMPORTANTE: fábricas, no singletons. Un singleton a nivel de módulo compartiría
 // el store en memoria entre instancias de la app (p.ej. entre tests), agotando la
 // cuota entre aplicaciones distintas. Cada buildApp() crea sus propios limiters.
@@ -63,6 +77,7 @@ export function createGlobalRateLimit() {
     limit: 600,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
+    keyGenerator: clientIp,
     // El polling de estado (GET) es parte del diseño y no debe consumir cuota;
     // el límite protege las MUTACIONES (pagos, arranques, admin).
     skip: (req) => req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS',
@@ -76,6 +91,7 @@ export function createPaymentCreationRateLimit() {
     limit: 10,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
+    keyGenerator: clientIp,
     message: { error: { code: 'RATE_LIMITED', message: 'Demasiados intentos de pago. Reintentá en un minuto.' } },
   });
 }
@@ -107,6 +123,7 @@ export function createAdminLoginRateLimit() {
     limit: 10,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
+    keyGenerator: clientIp,
     message: { error: { code: 'RATE_LIMITED', message: 'Demasiados intentos de inicio de sesión.' } },
   });
 }
@@ -117,6 +134,7 @@ export function createSimulateRateLimit() {
     limit: 30,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
+    keyGenerator: clientIp,
     message: { error: { code: 'RATE_LIMITED', message: 'Demasiadas simulaciones por minuto.' } },
   });
 }
