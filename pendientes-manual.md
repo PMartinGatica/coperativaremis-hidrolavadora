@@ -5,13 +5,15 @@
 > hacer, cómo, y cómo saber que salió bien. Andá tachando. Cuando termines uno, avisame y lo saco
 > de acá (si generó una decisión, queda su rastro en `ADR.md`).
 >
-> Última actualización: 2026-09-17. **A1, A2, A2b y A4b hechos — FASE 1 CERRADA DEL TODO
-> (ADR-044).** A4b se corrió con Pablo en el navegador, con su propia cuenta (no la de fábrica):
-> los 4 casos reproducibles a mano salieron OK, y el veredicto de `qa/FASE-1-manual.md` quedó
-> confirmado. Lo único pendiente ahora es lo que NO toca la Fase 1: A3 (chequeo de IP real,
-> puede esperar) y las Partes B/C/D (mensajes, terceros, hardware). ⚠️ Coolify despliega solo
-> cada vez que se sube código a `main` (tarda ~2 minutos). El ítem de ADR-007 (patente) se sacó:
-> lo resolvió el PIN (ADR-036). `mensajes/mensaje-dueno.md` ya tiene 2 preguntas, no 3.
+> Última actualización: 2026-09-18. **TODA LA PARTE A ESTÁ HECHA.** Fase 1 cerrada del todo
+> (A4b, ADR-044) y A3 cerrado encontrando y arreglando un bug real de rate-limit por IP
+> (ADR-045). **Lo que sigue es la Parte B**, y adentro de la Parte B lo más urgente es **B0**:
+> mandarle a Gaby la lista de compras del ESP32 (`mensajes/mensaje-compras-gaby.md`), porque
+> una de las placas figuraba como última unidad y sin placa no hay banco de pruebas. La compra
+> se armó el 2026-09-18 verificando los links uno por uno: apareció que la caja de la máquina es
+> **metálica**, así que el ESP32 pasó a ser el modelo **WROOM-32U** con antena externa (ADR-046).
+> ⚠️ Coolify despliega solo cada vez que se sube código a `main` (tarda ~2 minutos). El ítem de
+> ADR-007 (patente) se sacó: lo resolvió el PIN (ADR-036).
 
 ---
 
@@ -199,9 +201,15 @@ terminal). Resultados:
 Estos ya están escritos, listos para copiar y pegar en WhatsApp tal cual (formato `*negrita*` de
 WhatsApp incluido). Vos solo los mandás.
 
-- [ ] **B1. Mandar `mensajes/mensaje-tecnicos.md`** a quien te arma la parte eléctrica. Pide 3
-  datos de vuelta: qué módulo de relay compraron, qué contactor eligieron (y voltaje de la
-  bobina), y confirmación de que el timer viejo queda puesto para la primera prueba.
+- [ ] **B0. Mandar `mensajes/mensaje-compras-gaby.md`** a Gaby, que está en Buenos Aires.
+  Es la compra de la electrónica del ESP32 (placa, relay, protoboard, borneras, cables). **Lo
+  más urgente de los tres**: una de las placas figuraba como última unidad, y sin la placa no hay
+  banco de pruebas. Armado el 2026-09-18 con los links ya verificados uno por uno (ADR-046).
+- [ ] **B1. Mandar `mensajes/mensaje-tecnicos.md`** a quien te arma la parte eléctrica.
+  **Reescrito el 2026-09-18:** ahora la electrónica la comprás vos, así que a ellos les quedan el
+  contactor, el pulsador, la fuente y la instalación. Pide solo **2** datos de vuelta (antes eran
+  3): qué contactor eligieron (y voltaje de la bobina), y confirmación de que el timer viejo queda
+  puesto para la primera prueba. Suma el pedido de **puesta a tierra de la caja metálica**.
 - [ ] **B2. Mandar `mensajes/mensaje-dueno.md`** al dueño de la cooperativa. Ahora son solo 2
   preguntas (la de la patente ya se resolvió con el PIN): qué hacer si el cliente paga y no
   lava (reembolso), y cuándo te habilita el acceso a la cuenta de Mercado Pago de ellos. Incluye
@@ -211,8 +219,8 @@ WhatsApp incluido). Vos solo los mandás.
 **Cuando te contesten, anotá acá las respuestas** (para que yo las lea sin tener que
 preguntarte de nuevo):
 
-- Técnicos → módulo de relay: ______ · contactor/voltios de bobina: ______ · timer viejo
-  queda puesto: SÍ / NO
+- Técnicos → contactor/voltios de bobina: ______ · timer viejo queda puesto: SÍ / NO ·
+  caja puesta a tierra: SÍ / NO
 - Dueño cooperativa → política de reembolso (crédito automático / devolución MP / a mano):
   ______ · lavado fallido cuenta contra el cupo diario: SÍ / NO · fecha estimada de acceso a
   la cuenta de MP: ______
@@ -242,12 +250,20 @@ preguntarte de nuevo):
 
 ## PARTE D — Fuera de lo que se puede resolver desde una compu
 
+- [ ] **D0. Prueba de polaridad del relay en el banco** (cuando lleguen las compras de B0). La
+  hacés vos solo, con el protoboard y el tester, **sin el contactor conectado** — 5 minutos, no se
+  saltea. Qué se mide: si el módulo dispara con señal ALTA o BAJA. Con eso se fija
+  `RELAY_ACTIVE_LEVEL` en `firmware/esp32/src/app_config.h` (hoy dice `HIGH`, y por el tipo de
+  módulo que compraste es probable que haya que ponerlo en `LOW` — ver ADR-046). También queda
+  definido hacia dónde va la resistencia de 10 k del ADR-015: si es activo-bajo, de GPIO 26 a
+  3,3 V. **Avisame cuando tengas las piezas y te guío paso a paso**, igual que con A4b.
+  Recordá: al módulo relay hay que **sacarle el jumper `JD-VCC`** y alimentar la parte de señal a
+  3,3 V, no a 5 V.
 - [ ] **D1. Puesta en marcha del hardware, con vos presente.** `[STOP-HUMANO]` — no se hace sin
-  vos ni se automatiza. Antes de esto necesitamos las respuestas de B1 (técnicos) para configurar
-  el programa con el relay y contactor correctos. El timer eléctrico viejo se deja puesto como
-  red de seguridad hasta probar todo. Primer paso de la prueba: el módulo de relay se prueba en
-  el banco **sin el contactor conectado** — 5 minutos, no se saltea (si me equivoco de polaridad
-  en el programa, la máquina puede arrancar sola al prenderse la placa).
+  vos ni se automatiza. Antes de esto hacen falta D0 (polaridad medida) y la respuesta de B1
+  (contactor y voltaje de bobina). El timer eléctrico viejo se deja puesto como red de seguridad
+  hasta probar todo. Ojo con la caja metálica: la antena WiFi tiene que quedar montada **por
+  fuera**, con el pigtail atravesando la pared — adentro no hay señal (ADR-046).
 
 ---
 

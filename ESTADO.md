@@ -1,7 +1,7 @@
 # ESTADO — MUNDO: HIDRO SELF-SERVICE
 
 > Handoff entre sesiones. Reescribir, no acumular. ≤40 líneas.
-> Última actualización: 2026-09-18 · detalle en `ADR.md` (014–045)
+> Última actualización: 2026-09-18 · detalle en `ADR.md` (014–046)
 
 ## Arranque de la próxima sesión
 1. Cargá SOLO este `ESTADO.md` + `CLAUDE.md` del Mundo. `export GSTACK_PROJECT_SLUG=
@@ -20,9 +20,18 @@
    @hidro/api` = `node dist/index.js`) NO lee `.env` — no hay `dotenv`. Para simular una cuenta
    admin NO-default hay que exportar `ADMIN_EMAIL` en la terminal, no editar `.env`. Corregido en
    `qa/FASE-1-manual.md` (Preparación, punto 2).
-5. **Arrancar por acá:** no quedan pendientes bloqueantes de la Fase 1. Preguntarle a Pablo si
-   sigue con la **Parte B** (mandar los 2 mensajes ya redactados a técnicos y al dueño) o con
-   la Parte C (terceros: cuentas individuales, MP dev, decisión HTTPS).
+5. **Compra del hardware armada (ADR-046).** Dato nuevo que no estaba en ningún lado: **la caja
+   de la máquina es metálica** (hay agua en el taller) — jaula de Faraday, así que el ESP32 pasó
+   de WROOM-32 a **WROOM-32U** con antena externa. Mismo chip, mismo `board = esp32dev`, **el
+   firmware no se toca**. Además se corrió el reparto del ADR-014: la electrónica la compra
+   Pablo (socio en Buenos Aires), a los técnicos les quedan contactor + instalación, y por eso
+   ahora son **2** los datos bloqueantes, no 3. Mensajes listos: `mensaje-compras-gaby.md`
+   (nuevo) y `mensaje-tecnicos.md` (reescrito).
+6. **Arrancar por acá:** preguntarle a Pablo si ya mandó **B0** (lista de compras a Gaby — lo más
+   urgente, una placa estaba en última unidad) y **B1/B2**. Cuando lleguen las piezas, el próximo
+   trabajo técnico es **D0**: medir la polaridad del relay en el banco y fijar
+   `RELAY_ACTIVE_LEVEL` en `app_config.h` (hoy `HIGH`; probablemente tenga que ser `LOW`,
+   ADR-015/046). Guiarlo paso a paso como en A4b.
 
 ## Dónde estamos
 Producción (`hidro-api.insolvadev.com`) corre con el fix de seguridad desplegado y validado
@@ -42,5 +51,6 @@ propia (ADR-044), y el rate-limit por IP arreglado y verificado tras el túnel d
   reales), pero cualquier guía que diga "editar `.env` y reiniciar" está mal para desarrollo local.
 
 ## Pendientes humanos
-Ver `pendientes-manual.md`. **Fase 1 y A3 cerrados.** Queda B = 2 mensajes listos para mandar;
-C/D = terceros y hardware (fuera del alcance de Fase 1).
+Ver `pendientes-manual.md`. **Toda la Parte A cerrada.** Queda B = 3 mensajes listos para mandar
+(B0 compras a Gaby ← el más urgente, B1 técnicos, B2 dueño); C = terceros; D = banco (D0) y
+hardware (D1), ambos esperando que lleguen las piezas.

@@ -818,3 +818,33 @@
   `r=8` en el login-limit; datos móviles del celular dio `r=9, t=900` — ventana de 15 minutos
   completa recién arrancada, balde independiente, ya no sigue bajando desde el de wifi. A3
   cerrado del todo.
+
+- **2026-09-18 (ADR-046). Compra del hardware del ESP32: caja metálica obliga a antena externa, y
+  el reparto del ADR-014 se corre.** Al revisar la lista de compras con Pablo apareció un dato que
+  no estaba en ningún documento: **la caja estanca que ya existe en la máquina es metálica** (el
+  taller tiene agua, por eso se eligió metal). Una caja metálica es una jaula de Faraday: el
+  ESP32-WROOM-32 con antena impresa en la placa se queda sin señal WiFi adentro.
+  **Decisión: se pasa a ESP32-WROOM-32U** (mismo chip, mismo `board = esp32dev`, misma partición
+  de 4 MB del ADR-015 — cambia solo que trae conector u.FL para antena externa). **No toca
+  firmware.** La antena va montada por fuera de la caja, con pigtail u.FL → SMA hembra de panel
+  atravesando la pared. Placa elegida: ESP32-DevKitC V4 WROOM-32U, 4 MB flash, USB-C, ×2 (una de
+  banco, una de máquina); antena y pigtail vienen en el kit.
+  **Reparto de trabajo (corrige el ADR-014):** la electrónica del lado del ESP32 (placa, módulo
+  relay, antena, protoboard, borneras, cables) **la compra Pablo**, no los técnicos — su socio
+  está en Buenos Aires y ahí se consigue más fácil que en Ushuaia. A los técnicos les quedan el
+  contactor, el pulsador de panel, la fuente de 5 V y la instalación eléctrica. **Consecuencia
+  directa: los 3 datos bloqueantes del ADR-014 pasan a ser 2** — el nivel activo del relay ya no
+  se le pregunta a nadie, lo mide Pablo en el banco porque el módulo ahora lo compra él.
+  `mensajes/mensaje-tecnicos.md` reescrito en consecuencia; nuevo `mensajes/mensaje-compras-gaby.md`.
+  **Módulo relay elegido: 2 canales, 5 V, optoacoplado, con jumper `JD-VCC`** (verificado en la
+  foto del aviso). Ese jumper es lo que lo habilita: se saca el puente y queda `VCC` (header de
+  señal) a 3,3 V del ESP32 y `JD-VCC` a 5 V para las bobinas, así los optoacopladores trabajan al
+  nivel lógico del ESP32 y no a 5 V. Sin ese jumper el módulo quedaba marginal y se descartaba.
+  **Refuerza el ADR-015:** los relays son `SRD-05VDC-SL-C` con optoacoplador, familia que es casi
+  siempre **activo-BAJO**, mientras `app_config.h` todavía tiene `RELAY_ACTIVE_LEVEL HIGH`. O sea:
+  es probable que haya que cambiarlo a `LOW` antes de flashear la placa definitiva, y que la
+  resistencia de 10 k del ADR-015(c) vaya de GPIO 26 **a 3,3 V** (pull-up), no a GND. **Se mide en
+  el banco con tester, no se asume por la foto** — la regla del ADR-015 no cambia.
+  **Riesgo eléctrico nuevo, derivado de la caja metálica:** caja de metal + agua en el taller +
+  contactor de 220 V ⇒ la caja tiene que ir **puesta a tierra**. Es trabajo de los técnicos, ya
+  agregado por escrito al mensaje que se les manda.
