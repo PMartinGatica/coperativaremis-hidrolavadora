@@ -126,8 +126,9 @@ clientes reales (el "máquina ocupada" ya los serializa por lógica de negocio) 
 importar el día que agregues HIDRO-02, donde dos clientes en máquinas distintas podrían
 compartir cupo sin motivo. Por eso se arregló ahora que ya estaba diagnosticado.
 
-**Falta:** confirmar en producción después del redeploy, repitiendo el mismo test (wifi vs.
-datos móviles) — esta vez el contador debería resetear en vez de seguir bajando.
+**Confirmado en producción (2026-09-18, después del redeploy):** wifi dio `r=8`, datos móviles
+dio `r=9, t=900` (ventana de 15 min completa, recién arrancada) — balde independiente, no
+siguió bajando desde el de wifi. Arreglo verificado end-to-end.
 
 ### ✅ A4. Prueba de "pago que se recupera solo" — HECHO
 

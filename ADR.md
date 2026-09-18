@@ -813,6 +813,8 @@
   `createAdminLoginRateLimit`, `createSimulateRateLimit`. `createPinAttemptRateLimit` queda
   igual (ya era por patente, no por IP — decisión previa, ADR del Eng review de
   `pin-patente-remis-socio.md`). Build limpio, 113/113 tests OK (sin cambios de comportamiento
-  en tests: sin el header, cae al mismo `req.ip` de siempre). Pendiente: re-confirmar en
-  producción tras el deploy repitiendo el mismo test de las 2 redes (debería resetear en vez de
-  seguir bajando).
+  en tests: sin el header, cae al mismo `req.ip` de siempre).
+  **Re-confirmado en producción tras el redeploy (mismo día):** wifi domiciliaria dio
+  `r=8` en el login-limit; datos móviles del celular dio `r=9, t=900` — ventana de 15 minutos
+  completa recién arrancada, balde independiente, ya no sigue bajando desde el de wifi. A3
+  cerrado del todo.
