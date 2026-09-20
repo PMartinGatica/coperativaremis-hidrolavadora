@@ -232,9 +232,65 @@ preguntarte de nuevo):
   del `.env`) y está bloqueada a propósito para esto — cualquier intento con ella dice "usá tu
   cuenta individual". Con la lista de nombres/emails, agrego la pantalla para crear esas
   cuentas (hoy no existe).
-- [ ] **C2. Cuenta de desarrollador de Mercado Pago + usuario de prueba** (para vos, no para el
-  dueño de la cooperativa — esto es aparte de B2). La necesito para probar contra la API real de
-  MP antes de cobrar plata de verdad. Sin esto, todo sigue probado solo contra el modo DEMO.
+- [x] **C2. HECHO el 2026-09-20 — cuenta de developer + los 3 SPIKE de Mercado Pago validados
+  contra la API real (sandbox), en local.** Detalle en ADR-050 y ADR-051. `createPayment()` y
+  `searchByExternalReference()` funcionaban tal cual estaban escritos. **El webhook NO: tenía un
+  bug que lo rompía entero** (leía el id de `body.data.id`, pero MP lo manda en `body.resource`),
+  así que en producción ningún pago real habría autorizado la máquina por webhook — el cliente
+  habría esperado hasta que el barrido lo rescatara. Arreglado, con 5 tests nuevos, y verificado
+  end-to-end con un pago de sandbox real. **Lo único que falta de pagos:** `refundPayment()`
+  sigue siendo un stub, bloqueado por la política de reembolso (B2).
+
+  **Cómo se armó, para repetirlo (ej. con la cuenta real de la cooperativa cuando llegue B2):**
+  1. Con el usuario que va a ser "el vendedor" ya logueado en `mercadopago.com.ar`, entrar a
+     [mercadopago.com.ar/developers/panel/app](https://www.mercadopago.com.ar/developers/panel/app)
+     **en esa misma sesión** — no en otra pestaña, no con otra cuenta. Crear aplicación → **Pagos
+     online** → **Checkout Pro** (el código usa `Preference.create`, la Preferences API; el panel
+     avisa que se va a "descontinuar" a favor de Orders API — no migra sola, queda anotado en
+     ADR-050 como pendiente sin decidir, no bloquea nada de esto).
+  2. ⚠️ **Las credenciales de "Prueba" de la app de TU cuenta real NO sirven para probar pagos.**
+     Pertenecen a tu cuenta real y Mercado Pago rechaza pagarle con un comprador de prueba
+     (`"Una de las partes... es de prueba"`). Hace falta loguearse CON el usuario **Vendedor de
+     prueba** (Cuentas de prueba → Vendedor) y crear la aplicación de nuevo desde ADENTRO de esa
+     sesión — ahí las credenciales "Productivas" de esa cuenta ficticia sí sirven, porque toda la
+     cuenta es de prueba. Antes de pagar, confirmar con `GET https://api.mercadopago.com/users/me`
+     (header `Authorization: Bearer <access token>`) que el `nickname` devuelto empieza con
+     `TESTUSER` — si devuelve un email real, son las credenciales equivocadas.
+  3. Copiar Access Token + Public Key de esa app (la del Vendedor de prueba) a `apps/api/.env`
+     (⚠️ NO al `.env` de la raíz del repo — hay dos, y el código solo lee el de `apps/api/`,
+     `config.ts:121`; cargar ahí adentro deja la API en modo DEMO en silencio):
+     ```
+     PAYMENT_PROVIDER=mercadopago
+     MERCADOPAGO_ACCESS_TOKEN=<Productivas de la app del Vendedor de prueba>
+     MERCADOPAGO_PUBLIC_KEY=<idem>
+     ```
+     `PAYMENT_PROVIDER` ya existe en ese archivo con valor `demo` — cambiarlo, no duplicar la
+     línea. La config se lee una sola vez al arrancar: después de tocar el `.env`, reiniciar.
+  4. Mercado Pago rechaza `back_urls` con `localhost` cuando hay `auto_return` (`400
+     invalid_auto_return`) — para probar desde la compu, `PUBLIC_APP_URL` tiene que apuntar a un
+     dominio público real (se usó `https://hidro-api.insolvadev.com` sin tocar producción, solo
+     como valor de redirect de la preferencia de prueba).
+  5. Crear también una cuenta **Comprador** de prueba (mismo país que el Vendedor, no se puede
+     cambiar después). Para pagar: logueado con el Comprador (no como invitado — como invitado
+     pide un email y cualquier email real vuelve a disparar el error de "partes mezcladas"),
+     tarjeta de [la tabla oficial](https://www.mercadopago.com.ar/developers/es/docs/your-integrations/test/cards),
+     titular **APRO** para que apruebe.
+
+  6. **Para probar el webhook** hace falta que MP pueda pegarle a tu compu: `ngrok http 3020`
+     (el agente tiene que ser 3.20+, si no MP... perdón, ngrok rechaza la conexión: `ngrok
+     update`). La URL pública que te da va en `apps/api/.env` como `PUBLIC_API_URL` (⚠️ distinta
+     de `PUBLIC_APP_URL`, que es la de los `back_urls`), y en el panel de MP → la app del
+     Vendedor de prueba → **Webhooks** → "Configurar notificaciones" → URL de prueba
+     `<tunel>/api/webhooks/mercadopago`, evento **Pagos**. Al guardar te da la **firma secreta**
+     → `MERCADOPAGO_WEBHOOK_SECRET` en el mismo `.env`. Reiniciar la API después de cada cambio.
+     ⚠️ **Cerrá el túnel cuando termines** — mientras corre, tu máquina está expuesta a internet.
+
+  ⚠️ **Cómo saber si el webhook realmente funcionó (y no confundirse, como pasó el 2026-09-19):**
+  el sistema tiene un barrido de respaldo que hace casi lo mismo que el webhook, así que ver la
+  sesión en `WAITING_FOR_BUTTON` **no prueba nada por sí solo**. Miralo por el reloj: el webhook
+  autoriza en segundos, el barrido recién al cruzar el timeout (900 s en esa prueba). Y confirmalo
+  en el inspector de ngrok (`http://127.0.0.1:4040`): tiene que haber un POST a
+  `/api/webhooks/mercadopago` con respuesta **200**.
 
 ---
 

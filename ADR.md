@@ -928,3 +928,57 @@
   Nota operativa: mientras corre un lavado simulado la máquina queda **BUSY 180 s reales**
   (`TEST_SPEED_FACTOR` se fuerza a 1 en producción), así que una prueba propia le tapa la pantalla
   al dueño por 3 minutos. Sigue vigente lo del ADR-048: apagar la variable antes de D1.
+
+- **2026-09-18 (ADR-050). Dos de los tres SPIKE de `mercadoPagoProvider.ts` quedaron validados
+  contra la API real de Mercado Pago (sandbox), en local — nunca contra producción.**
+  `createPayment()` (Preferences API) y `searchByExternalReference()` funcionan tal cual estaban
+  escritos, sin cambios de código. Falta: firma del webhook (necesita túnel público, no se probó)
+  y `refundPayment()` (stub, bloqueado por decisión de política de reembolso — B2).
+  **Tres trampas reales encontradas haciendo la prueba (quedaron en `pendientes-manual.md` C2):**
+  (i) hay DOS `.env` en el repo (raíz y `apps/api/`); el código solo lee el de `apps/api/` —
+  cargar las credenciales en el de la raíz arranca en modo DEMO en silencio, sin avisar. (ii)
+  Mercado Pago rechaza `back_urls` con `localhost` cuando hay `auto_return` (`400
+  invalid_auto_return`) — para probar desde la compu hay que apuntar `PUBLIC_APP_URL` a un
+  dominio público (se usó `hidro-api.insolvadev.com`, sin tocar producción, solo como valor de
+  redirect en la preferencia de prueba). (iii) **Las cuentas de prueba (Vendedor/Comprador) no
+  alcanzan por sí solas.** Las credenciales de prueba que muestra tu app REAL (solapa
+  "Credenciales de prueba") pertenecen a tu cuenta real y no se pueden parear con un comprador de
+  prueba (`"Una de las partes... es de prueba"`). Hay que loguearse CON el usuario Vendedor de
+  prueba y crear una aplicación propia desde ADENTRO de esa sesión — recién esas credenciales
+  ("Productivas" del vendedor ficticio) sirven para pagar con el Comprador ficticio. Se verificó
+  con `GET /users/me` antes de intentar el pago (nickname `TESTUSER...` = cuenta de prueba real).
+  **Pendiente sin resolver, no bloquea nada hoy:** el panel avisó que la Preferences API "será
+  descontinuada" a favor de Orders API. El código sigue en Preferences (funciona, validado hoy).
+  Migrar a Orders es un cambio de arquitectura del proveedor de pago, no una config — si se
+  decide migrar, pasa por `/autoplan` antes de tocar código, no se decide en esta línea.
+
+- **2026-09-20 (ADR-051). El webhook de Mercado Pago NUNCA habría funcionado en producción: el
+  body real no tiene la forma que el código esperaba. Encontrado y arreglado con un pago real de
+  sandbox, cierra el tercer SPIKE.** El código leía el payment id de `body.data.id` (formato que
+  documenta MP), pero el webhook que MP dispara para `topic=payment` llega en formato IPN legado:
+  `{"resource":"178974981453","topic":"payment"}` — sin `data.id`. Resultado: **401 en todos los
+  webhooks**, nunca llegaba siquiera a validar la firma. En producción esto significaba que
+  ningún pago real habría autorizado la máquina por webhook; el cliente pagaba y esperaba hasta
+  que el barrido lo rescatara al cruzar el timeout (hasta 120 s de default en producción). No lo
+  detectó ningún test porque `validateWebhook` **no tenía ni un test** desde el primer commit —
+  el resto de la suite usa el SDK mockeado y nunca pasa por ahí. Se agregaron 5 (118 → 123).
+  **Arreglos:** (i) `validateWebhook` toma el id de `body.data.id` **o** `body.resource`, y el
+  payload del HMAC se arma con ese mismo id (antes usaba `data.id`, que acá era `undefined`).
+  (ii) `webhookRoutes` ignora con **200** cualquier `topic`/`type` que no sea `payment` — MP manda
+  un `merchant_order` en paralelo a cada pago, y devolverle 401 a eso en cada lavado es la forma
+  de que MP termine dando de baja el webhook por fallar seguido.
+  **Verificado end-to-end con plata de sandbox** (`HS-6KDW8F`, 2026-09-20): pago aprobado →
+  webhook recibido → firma validada → `AUTH_CREATED` en **2 min 46 s**, muy por debajo de los
+  900 s del barrido, así que la autorización fue del webhook y no del respaldo. Se confirmó con
+  el inspector del túnel: MP manda el MISMO evento por dos vías en paralelo —
+  `?id=X&topic=payment` (IPN legado) y `?data.id=X&type=payment` (webhooks nuevo).
+  **Trampa de método, vale para la próxima:** en el intento anterior (`HS-PEUGPN`) canté victoria
+  al ver la sesión pasar a `WAITING_FOR_BUTTON`, pero había sido el **barrido**, no el webhook —
+  el reloj lo delató (reconciliación a los 900,2 s de creada la sesión, con `source: 'sweep'` en
+  el audit). Con un mecanismo de respaldo que hace exactamente lo mismo que el que se está
+  probando, el estado final NO alcanza como evidencia: hay que mirar el timing y el request real.
+  **Queda abierto (menor, no bloquea):** la vía IPN legada sigue devolviendo 401 aun con el
+  fallback puesto — la firma de ESA vía no valida con el mismo esquema. No importa hoy porque MP
+  ya recibe su 200 por la vía nueva y el pago se procesa una sola vez (idempotente), pero conviene
+  entenderlo antes de ir a producción con plata real, por si MP cuenta esos 401 para dar de baja
+  el webhook.

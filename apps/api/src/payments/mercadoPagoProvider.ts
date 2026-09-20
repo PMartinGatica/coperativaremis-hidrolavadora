@@ -132,8 +132,12 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
   /**
    * Valida firma del webhook (esquema oficial Mercado Pago):
    *   header x-signature: "ts=<unix>,v1=<hex>"
-   *   hex = HMAC_SHA256(secret, "id:<data.id>;request-id:<x-request-id>;ts:<ts>;")
-   * SPIKE: confirmar esquema exacto contra la documentación vigente de Mercado Pago.
+   *   hex = HMAC_SHA256(secret, "id:<payment id>;request-id:<x-request-id>;ts:<ts>;")
+   * CONFIRMADO CONTRA MP REAL (2026-09-19, ver ADR-050/051): el body llega en formato IPN
+   * legado `{"resource":"<id>","topic":"payment"}`, NO `{"data":{"id":...}}` como decía la
+   * doc genérica — por eso el fallback a `body.resource`. `topic=merchant_order` (que MP manda
+   * en paralelo a cada pago) se filtra antes, en `webhookRoutes.ts`: no tiene payment id y no
+   * hay nada que reconciliar ahí.
    * Sin secret configurado: en desarrollo se acepta con WARNING (la re-consulta es la
    * verdadera barrera de seguridad); en producción se RECHAZA.
    */
@@ -142,7 +146,13 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data: any = body.data ?? body;
     const paymentId =
-      typeof data?.id === 'number' ? String(data.id) : typeof data?.id === 'string' ? data.id : undefined;
+      typeof data?.id === 'number'
+        ? String(data.id)
+        : typeof data?.id === 'string'
+          ? data.id
+          : typeof body.resource === 'string'
+            ? body.resource
+            : undefined;
     if (!paymentId) return { valid: false, reason: 'sin payment id en el body' };
 
     const secret = this.config.mercadopagoWebhookSecret;
@@ -162,7 +172,7 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
     const v1 = match[2] as string;
     const requestId = this.header(req, 'x-request-id') ?? '';
 
-    const payload = `id:${data.id};request-id:${requestId};ts:${ts};`;
+    const payload = `id:${paymentId};request-id:${requestId};ts:${ts};`;
     const computed = createHmac('sha256', secret).update(payload, 'utf8').digest('hex');
     const a = Buffer.from(computed, 'utf8');
     const b = Buffer.from(v1, 'utf8');

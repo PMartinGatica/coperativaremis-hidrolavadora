@@ -17,6 +17,15 @@ export function webhookRoutes(ctx: AppContext): Router {
   const r = Router();
 
   r.post('/mercadopago', ah(async (req, res) => {
+    // Mercado Pago manda un webhook de "merchant_order" en paralelo a cada pago (confirmado
+    // en pruebas reales, ADR-050/051): no tiene payment id y no hay nada que reconciliar acá.
+    // Se ignora ANTES de validar firma -- devolverle 401 a esto en cada lavado real es la forma
+    // de que MP termine desactivando el webhook por fallar seguido.
+    const topic = typeof req.query.topic === 'string' ? req.query.topic : (req.body as Record<string, unknown> | undefined)?.topic;
+    if (topic && topic !== 'payment') {
+      return res.status(200).json({ ok: true, result: 'ignored_topic' });
+    }
+
     if (ctx.provider.name !== 'mercadopago') {
       await insertAudit(ctx.db, {
         actor: 'system',

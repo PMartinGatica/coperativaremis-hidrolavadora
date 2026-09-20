@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import { loadConfig } from '../src/config.js';
 
@@ -20,13 +21,14 @@ vi.mock('mercadopago', () => ({
   Payment: vi.fn().mockImplementation(() => ({ get: mockGet, search: mockSearch })),
 }));
 
-function fakeConfig() {
+function fakeConfig(overrides: Parameters<typeof loadConfig>[0] = {}) {
   return loadConfig({
     paymentProvider: 'mercadopago',
     mercadopagoAccessToken: 'TEST-token',
     mercadopagoPublicKey: 'TEST-public',
     publicAppUrl: 'http://localhost:5173',
     publicApiUrl: 'http://localhost:3020',
+    ...overrides,
   });
 }
 
@@ -130,5 +132,83 @@ describe('MercadoPagoPaymentProvider (SDK mockeado)', () => {
     const provider = new MercadoPagoPaymentProvider(fakeConfig());
     const result = await provider.searchByExternalReference('sess-1', 500);
     expect(result.outcome).toBe('not_found');
+  });
+
+  /**
+   * validateWebhook: confirmado contra Mercado Pago real en sandbox el 2026-09-19 (ADR-050/051).
+   * MP manda el mismo evento en DOS formatos en paralelo: el legado `{"resource":"<id>",
+   * "topic":"payment"}` (query `?id=...&topic=payment`) y el nuevo `{"data":{"id":"<id>"}}`
+   * (query `?data.id=...&type=payment`). El fallback a `body.resource` es lo que evita que el
+   * legado se rechace solo por no tener `data.id` — sin este test, "simplificar" ese fallback
+   * rompe el webhook real sin que ningún otro test lo note (el resto usa SDK mockeado, nunca
+   * pasa por acá).
+   */
+  describe('validateWebhook (firma HMAC, ADR-050/051)', () => {
+    const secret = 'test-webhook-secret';
+
+    function sign(paymentId: string, ts: string, requestId: string) {
+      const payload = `id:${paymentId};request-id:${requestId};ts:${ts};`;
+      return createHmac('sha256', secret).update(payload, 'utf8').digest('hex');
+    }
+
+    function req(body: Record<string, unknown>, opts: { ts?: string; requestId?: string; paymentId?: string; badSignature?: boolean } = {}) {
+      // Ahora: `validateWebhook` rechaza timestamps de más de 300 s (anti-replay), así que un
+      // ts fijo haría fallar la suite sola con el paso del tiempo.
+      const ts = opts.ts ?? String(Math.floor(Date.now() / 1000));
+      const requestId = opts.requestId ?? 'req-1';
+      const paymentId = opts.paymentId ?? '178976950845';
+      const v1 = opts.badSignature ? 'f'.repeat(64) : sign(paymentId, ts, requestId);
+      return {
+        headers: { 'x-signature': `ts=${ts},v1=${v1}`, 'x-request-id': requestId },
+        body,
+        query: {},
+      };
+    }
+
+    it('formato nuevo {data:{id}} con firma válida -> valid', async () => {
+      const { MercadoPagoPaymentProvider } = await import('../src/payments/mercadoPagoProvider.js');
+      const provider = new MercadoPagoPaymentProvider(fakeConfig({ mercadopagoWebhookSecret: secret }));
+      const result = await provider.validateWebhook(req({ data: { id: '178976950845' } }));
+      expect(result).toEqual({ valid: true, providerPaymentId: '178976950845' });
+    });
+
+    it('formato legado {resource, topic} (el que realmente manda MP para topic=payment) con firma válida -> valid', async () => {
+      const { MercadoPagoPaymentProvider } = await import('../src/payments/mercadoPagoProvider.js');
+      const provider = new MercadoPagoPaymentProvider(fakeConfig({ mercadopagoWebhookSecret: secret }));
+      const result = await provider.validateWebhook(req({ resource: '178976950845', topic: 'payment' }));
+      expect(result).toEqual({ valid: true, providerPaymentId: '178976950845' });
+    });
+
+    it('sin data.id ni resource -> invalid, nunca intenta procesar', async () => {
+      const { MercadoPagoPaymentProvider } = await import('../src/payments/mercadoPagoProvider.js');
+      const provider = new MercadoPagoPaymentProvider(fakeConfig({ mercadopagoWebhookSecret: secret }));
+      const result = await provider.validateWebhook(req({ topic: 'merchant_order' }));
+      expect(result.valid).toBe(false);
+    });
+
+    it('firma HMAC que no matchea (payload alterado o secret distinto) -> invalid', async () => {
+      const { MercadoPagoPaymentProvider } = await import('../src/payments/mercadoPagoProvider.js');
+      const provider = new MercadoPagoPaymentProvider(fakeConfig({ mercadopagoWebhookSecret: secret }));
+      const result = await provider.validateWebhook(req({ resource: '178976950845', topic: 'payment' }, { badSignature: true }));
+      expect(result.valid).toBe(false);
+    });
+
+    it('secret no configurado en producción -> invalid (nunca se acepta un webhook sin firma en producción)', async () => {
+      const { MercadoPagoPaymentProvider } = await import('../src/payments/mercadoPagoProvider.js');
+      // `nodeEnv: 'production'` hace correr assertProductionConfig(), así que hay que pasarle
+      // una config que sobreviva las guardas reales (secrets largos, simulador apagado).
+      const provider = new MercadoPagoPaymentProvider(
+        fakeConfig({
+          nodeEnv: 'production',
+          mercadopagoWebhookSecret: null,
+          deviceSimulator: false,
+          jwtSecret: 'j'.repeat(40),
+          deviceAuthSecret: 'd'.repeat(40),
+          adminPassword: 'clave-admin-larga-2026',
+        }),
+      );
+      const result = await provider.validateWebhook(req({ resource: '178976950845', topic: 'payment' }));
+      expect(result.valid).toBe(false);
+    });
   });
 });
