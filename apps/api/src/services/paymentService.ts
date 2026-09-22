@@ -286,6 +286,28 @@ export async function processApproval(deps: PaymentDeps, input: ApprovalInput): 
       entityId: auth.id,
       metadata: { sessionId: session.id, machineId: payment.machineId, ttlSeconds: ttl },
     });
+    // Una aprobación que NO entró por el webhook es, por definición, un webhook que no llegó:
+    // el cliente esperó parado frente a la máquina hasta que lo rescató el barrido o mesa de
+    // entrada. Un caso aislado es ruido de red; varios seguidos significan que la vía firmada
+    // no está llegando — el escenario típico es una cuenta de Mercado Pago nueva sin el webhook
+    // dado de alta en su panel (ADR-052).
+    // OJO al modificar: NO sirve deducir esto mirando si la sesión tiene un `WEBHOOK_RECEIVED`.
+    // Ese audit se escribe unas líneas más arriba para TODOS los sources, incluido el barrido,
+    // así que esa consulta da siempre falso. El `source` es el dato, no el rastro.
+    if (input.source !== 'webhook') {
+      deps.logger.error('pago aprobado SIN webhook: la notificación de Mercado Pago no llegó', {
+        sessionId: session.id,
+        externalPaymentId: input.externalPaymentId,
+        source: input.source,
+      });
+      await insertAudit(tx, {
+        actor: 'system',
+        action: 'WEBHOOK_MISSING',
+        entity: 'payment',
+        entityId: payment.id,
+        metadata: { sessionId: session.id, source: input.source },
+      });
+    }
     return { result: 'approved', sessionId: session.id, authorizationId: auth.id };
   }
 

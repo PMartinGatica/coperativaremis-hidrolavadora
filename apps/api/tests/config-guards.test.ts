@@ -76,6 +76,32 @@ describe('guardas de configuración de producción', () => {
     expect(() => assertProductionConfig(cfg)).toThrow(/ADMIN_PASSWORD/);
   });
 
+  // ADR-052: sin webhook secret, validateWebhook rechaza TODA notificación en producción y cada
+  // pago real queda a merced del barrido, que es de un solo disparo. El secret no se inventa
+  // acá: sale de dar de alta el webhook en el panel de Mercado Pago de esa cuenta, y ese alta es
+  // justo el paso que se olvida al estrenar una cuenta nueva. Que falle en el deploy.
+  it('PAYMENT_PROVIDER=mercadopago sin MERCADOPAGO_WEBHOOK_SECRET -> tira', () => {
+    const cfg = prodConfig({
+      paymentProvider: 'mercadopago',
+      mercadopagoWebhookSecret: null,
+      deviceSimulator: false,
+    });
+    expect(() => assertProductionConfig(cfg)).toThrow(/MERCADOPAGO_WEBHOOK_SECRET/);
+  });
+
+  it('PAYMENT_PROVIDER=mercadopago con webhook secret cargado -> no tira', () => {
+    const cfg = prodConfig({
+      paymentProvider: 'mercadopago',
+      mercadopagoWebhookSecret: 'secreto-del-panel-de-mp',
+      deviceSimulator: false,
+    });
+    expect(() => assertProductionConfig(cfg)).not.toThrow();
+  });
+
+  it('PAYMENT_PROVIDER=demo sin webhook secret -> no tira (la guarda es solo para MP)', () => {
+    expect(() => assertProductionConfig(prodConfig({ mercadopagoWebhookSecret: null }))).not.toThrow();
+  });
+
   it('las 3 inválidas juntas -> un solo error que nombra las 3, sin valores', () => {
     const cfg = prodConfig({
       jwtSecret: 'VALOR-JWT-VISIBLE',

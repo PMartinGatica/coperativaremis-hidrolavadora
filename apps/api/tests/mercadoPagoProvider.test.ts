@@ -135,13 +135,17 @@ describe('MercadoPagoPaymentProvider (SDK mockeado)', () => {
   });
 
   /**
-   * validateWebhook: confirmado contra Mercado Pago real en sandbox el 2026-09-19 (ADR-050/051).
-   * MP manda el mismo evento en DOS formatos en paralelo: el legado `{"resource":"<id>",
-   * "topic":"payment"}` (query `?id=...&topic=payment`) y el nuevo `{"data":{"id":"<id>"}}`
-   * (query `?data.id=...&type=payment`). El fallback a `body.resource` es lo que evita que el
-   * legado se rechace solo por no tener `data.id` — sin este test, "simplificar" ese fallback
-   * rompe el webhook real sin que ningún otro test lo note (el resto usa SDK mockeado, nunca
-   * pasa por acá).
+   * validateWebhook en aislamiento. MP manda el mismo evento en DOS formatos en paralelo: el
+   * legado `{"resource":"<id>","topic":"payment"}` (query `?id=...&topic=payment`) y el nuevo
+   * `{"data":{"id":"<id>"}}` (query `?data.id=...&type=payment`). El fallback a `body.resource`
+   * extrae el id en los dos casos — sin este test, "simplificar" ese fallback pasa desapercibido.
+   *
+   * ⚠️ LEER ANTES DE CONFIAR EN EL CASO "formato legado con firma válida" (corregido en ADR-052):
+   * acá la firma la calcula `sign()`, o sea el propio test, con el mismo manifest que espera el
+   * código. Por eso pasa. **Mercado Pago NO firma así la vía legada**: su doc dice que la firma
+   * de IPN no se puede validar con el secret de la aplicación, y en la prueba real de sandbox esa
+   * vía dio "firma HMAC inválida". Este test prueba la extracción del id, NO que MP firme de esta
+   * forma. Lo que contesta el sistema a cada vía se prueba en `webhook-routes.test.ts`.
    */
   describe('validateWebhook (firma HMAC, ADR-050/051)', () => {
     const secret = 'test-webhook-secret';
@@ -193,20 +197,24 @@ describe('MercadoPagoPaymentProvider (SDK mockeado)', () => {
       expect(result.valid).toBe(false);
     });
 
+    /**
+     * Segunda línea de defensa (ADR-052). Desde que `assertProductionConfig` exige
+     * `MERCADOPAGO_WEBHOOK_SECRET`, este estado — producción + Mercado Pago + sin secret — ya no
+     * se puede alcanzar por la puerta de entrada: la API no arranca. Por eso la config se arma
+     * en dos pasos y se fuerza el estado imposible **sin pasar por `loadConfig`**; construirla
+     * con `fakeConfig({nodeEnv:'production', ...})` ahora tira la guarda, que es lo correcto y
+     * tiene su propio test en `config-guards.test.ts`.
+     * El chequeo sigue valiendo: si alguien afloja esa guarda, `validateWebhook` tiene que
+     * seguir negándose a aceptar un webhook sin firma en producción.
+     */
     it('secret no configurado en producción -> invalid (nunca se acepta un webhook sin firma en producción)', async () => {
       const { MercadoPagoPaymentProvider } = await import('../src/payments/mercadoPagoProvider.js');
-      // `nodeEnv: 'production'` hace correr assertProductionConfig(), así que hay que pasarle
-      // una config que sobreviva las guardas reales (secrets largos, simulador apagado).
-      const provider = new MercadoPagoPaymentProvider(
-        fakeConfig({
-          nodeEnv: 'production',
-          mercadopagoWebhookSecret: null,
-          deviceSimulator: false,
-          jwtSecret: 'j'.repeat(40),
-          deviceAuthSecret: 'd'.repeat(40),
-          adminPassword: 'clave-admin-larga-2026',
-        }),
-      );
+      const config = {
+        ...fakeConfig({ mercadopagoWebhookSecret: 'se-borra-abajo', deviceSimulator: false }),
+        nodeEnv: 'production' as const,
+        mercadopagoWebhookSecret: null,
+      };
+      const provider = new MercadoPagoPaymentProvider(config);
       const result = await provider.validateWebhook(req({ resource: '178976950845', topic: 'payment' }));
       expect(result.valid).toBe(false);
     });

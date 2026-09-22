@@ -72,7 +72,41 @@ Restricciones de base de datos como red de seguridad:
 | Webhook 2x del mismo pago | 2da vez → `WEBHOOK_DUPLICATED`, misma autorización, sin duplicar nada |
 | Crash entre "payment APPROVED" y "auth creada" | el siguiente webhook detecta APPROVED sin auth y la crea (recuperación) |
 | Webhook con pago desconocido | auditado e ignorado (no se genera nada) |
-| Webhook con firma inválida | 401 + `WEBHOOK_INVALID` (Mercado Pago no debe reintentar un webhook inválido; en dev sin secret se acepta con warning y la re-consulta es la barrera real) |
+| Webhook con firma inválida | 401 + `WEBHOOK_INVALID` (en dev sin secret se acepta con warning y la re-consulta es la barrera real) |
+
+## Las DOS vías de notificación de Mercado Pago (ADR-051/052)
+
+Verificado contra MP real en sandbox: **MP avisa del mismo pago por dos caminos en paralelo**, y
+no se habilitan igual.
+
+| Vía | Cómo se habilita | Query / body | Firma | Qué contesta el sistema |
+|---|---|---|---|---|
+| **Webhooks** (nueva) | a mano, en el panel de la cuenta → de ahí sale `MERCADOPAGO_WEBHOOK_SECRET` | `?data.id=X&type=payment` · `{"data":{"id":"X"}}` | verificable | **200**, procesa el pago |
+| **IPN** (legada) | sola, vía `notification_url` en cada preference | `?id=X&topic=payment` · `{"resource":"X","topic":"payment"}` | **NO verificable con nuestro secret** | **200** acusado, `WEBHOOK_IGNORED_IPN`, sin procesar |
+| `merchant_order` | idem | `?topic=merchant_order` | — | **200**, `ignored_topic` |
+
+MP documenta que la firma de IPN no se puede validar con el secret de la aplicación, y que IPN va
+a ser discontinuada. Por eso se acusa recibo sin procesar: el pago entra por la vía firmada.
+
+**Por qué el código de respuesta importa:** si MP no recibe 200/201, **reintenta hasta 4 días**.
+De ahí las tres reglas del handler (`webhookRoutes.ts`):
+
+1. Se valida la firma **antes** de clasificar. Clasificar primero permitiría descartar en
+   silencio una notificación firmada y legítima si MP cambiara un formato.
+2. Lo esperado y no verificable (IPN) recibe **200**: no tiene sentido que MP reintente por días
+   algo que igual no vamos a procesar.
+3. Un problema **nuestro** (falta el secret) recibe **503** a propósito, para que la cola de
+   reintentos siga viva y el pago se procese solo al cargar el secret. Como refuerzo,
+   `assertProductionConfig` no deja arrancar la API sin el secret cuando el provider es
+   mercadopago: el fallo ocurre en el deploy, no con un cliente parado frente a la máquina.
+
+⚠️ **El paso que se olvida al estrenar una cuenta nueva** es dar de alta el webhook en el panel de
+esa cuenta. Sin eso no hay secret, no llega la vía firmada, y cada pago dependería del barrido —
+que hace un solo intento. Checklist en `pendientes-manual.md` C2b.
+
+Cuando una aprobación entra por un camino que no es el webhook (`sweep`, `admin_recheck`,
+`admin_manual`), queda un `WEBHOOK_MISSING` en el audit y un `logger.error`: varios seguidos
+significan que la vía firmada no está llegando.
 
 ## SIMULAR PAGO (DEMO)
 

@@ -133,11 +133,14 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
    * Valida firma del webhook (esquema oficial Mercado Pago):
    *   header x-signature: "ts=<unix>,v1=<hex>"
    *   hex = HMAC_SHA256(secret, "id:<payment id>;request-id:<x-request-id>;ts:<ts>;")
-   * CONFIRMADO CONTRA MP REAL (2026-09-19, ver ADR-050/051): el body llega en formato IPN
-   * legado `{"resource":"<id>","topic":"payment"}`, NO `{"data":{"id":...}}` como decía la
-   * doc genérica — por eso el fallback a `body.resource`. `topic=merchant_order` (que MP manda
-   * en paralelo a cada pago) se filtra antes, en `webhookRoutes.ts`: no tiene payment id y no
-   * hay nada que reconciliar ahí.
+   * CONFIRMADO CONTRA MP REAL (2026-09-19/20, ver ADR-050/051/052): MP manda el MISMO pago por
+   * DOS vías en paralelo — la nueva `{"data":{"id":...}}` (query `?data.id=X&type=payment`), que
+   * es la que viene firmada y la que se procesa, y la IPN legada `{"resource":"<id>",
+   * "topic":"payment"}` (query `?id=X&topic=payment`), cuya firma MP NO permite validar con
+   * nuestro secret. Por eso el fallback a `body.resource` extrae el id igual, pero la vía legada
+   * termina rechazada acá por firma y `webhookRoutes.ts` le contesta 200 sin procesarla.
+   * ⚠️ El comentario anterior decía que MP manda SOLO el formato legado: era falso y contradecía
+   * al propio ADR-051. `topic=merchant_order` se filtra antes, en `webhookRoutes.ts`.
    * Sin secret configurado: en desarrollo se acepta con WARNING (la re-consulta es la
    * verdadera barrera de seguridad); en producción se RECHAZA.
    */

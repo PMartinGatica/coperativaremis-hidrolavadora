@@ -216,6 +216,8 @@ const LABELS: Record<string, string> = {
   WEBHOOK_RECEIVED: 'Webhook recibido',
   WEBHOOK_DUPLICATED: 'Webhook duplicado (ignorado)',
   WEBHOOK_INVALID: 'Webhook inválido (descartado)',
+  WEBHOOK_IGNORED_IPN: 'Aviso viejo de Mercado Pago (acusado, no procesado)',
+  WEBHOOK_MISSING: 'El aviso de Mercado Pago no llegó (se recuperó por otra vía)',
   WEBHOOK_UNKNOWN_PAYMENT: 'Webhook de pago desconocido',
   AUTH_CREATED: 'Autorización generada',
   AUTH_CONSUMED: 'Autorización consumida',

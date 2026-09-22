@@ -110,6 +110,18 @@ export function assertProductionConfig(config: AppConfig): void {
       'DEVICE_SIMULATOR=true con PAYMENT_PROVIDER=mercadopago: el simulador solo puede convivir con pagos DEMO (apagar DEVICE_SIMULATOR antes de cobrar de verdad)',
     );
   }
+  // Sin webhook secret, validateWebhook rechaza TODA notificación en producción
+  // (mercadoPagoProvider.ts) y cada pago real espera al barrido — que es de un solo disparo:
+  // si no encuentra el pago al cruzar el timeout, la sesión queda PAYMENT_EXPIRED y solo la
+  // rescata mesa de entrada a mano. El secret NO sale del código: se genera al dar de alta el
+  // webhook en el panel de Mercado Pago de la cuenta, y ese alta es justo el paso que se olvida
+  // al estrenar una cuenta nueva. Falla en el deploy, no con un cliente parado frente a la
+  // máquina (encontrado por el review de ADR-052).
+  if (config.paymentProvider === 'mercadopago' && !config.mercadopagoWebhookSecret) {
+    problems.push(
+      'MERCADOPAGO_WEBHOOK_SECRET falta con PAYMENT_PROVIDER=mercadopago: hay que dar de alta el webhook en el panel de Mercado Pago (Webhooks → evento Pagos) y cargar acá la firma secreta que devuelve',
+    );
+  }
   if (problems.length > 0) {
     throw new Error(`Configuración de producción inválida:\n- ${problems.join('\n- ')}`);
   }

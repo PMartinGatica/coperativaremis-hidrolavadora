@@ -113,6 +113,35 @@ describe('barrido: recuperación de webhook perdido antes de vencer (T4)', () =>
     expect(await sessionAuditActions(t, checkout.sessionId)).toContain('PAYMENT_AUTO_RECONCILED');
   });
 
+  /**
+   * ADR-052. Una aprobación que no entró por el webhook ES un webhook que no llegó, y el cliente
+   * lo pagó esperando parado frente a la máquina. Varias seguidas significan que la vía firmada
+   * de Mercado Pago no está llegando — típicamente, una cuenta nueva sin el webhook dado de alta
+   * en su panel. Tiene que quedar rastro explícito, no deducible.
+   *
+   * ⚠️ NO reescribir este chequeo como "la sesión no tiene WEBHOOK_RECEIVED": ese audit se
+   * escribe para TODOS los orígenes, incluido el barrido, así que esa versión da siempre falso
+   * (así estaba especificado el detector antes del review, y no podía dispararse nunca).
+   */
+  it('recuperado por el barrido -> queda WEBHOOK_MISSING (el aviso de MP no llegó)', async () => {
+    t = await createTestApp({ paymentPendingTimeoutSeconds: 120 });
+    const checkout = await createPendingSession(t);
+    const demo = t.ctx.provider as DemoPaymentProvider;
+    demo.approve(checkout.payment.externalPaymentId);
+    await forceExpire(t);
+    const acciones = await sessionAuditActions(t, checkout.sessionId);
+    expect(acciones).toContain('WEBHOOK_MISSING');
+    // Y el rastro sigue conviviendo con WEBHOOK_RECEIVED, que el propio barrido escribe: por eso
+    // la ausencia de WEBHOOK_RECEIVED no sirve como señal.
+    expect(acciones).toContain('WEBHOOK_RECEIVED');
+  });
+
+  it('aprobado por el webhook normal -> NO queda WEBHOOK_MISSING', async () => {
+    t = await createTestApp();
+    const { sessionId } = await payAndAuthorize(t);
+    expect(await sessionAuditActions(t, sessionId)).not.toContain('WEBHOOK_MISSING');
+  });
+
   it('regresión: sin pago aprobado en el proveedor, la sesión vence normalmente', async () => {
     t = await createTestApp({ paymentPendingTimeoutSeconds: 120 });
     const checkout = await createPendingSession(t);
