@@ -219,9 +219,16 @@ preguntarte de nuevo):
 
 - Técnicos → contactor/voltios de bobina: ______ · timer viejo queda puesto: SÍ / NO ·
   caja puesta a tierra: SÍ / NO
-- Dueño cooperativa → política de reembolso (crédito automático / devolución MP / a mano):
-  ______ · lavado fallido cuenta contra el cupo diario: SÍ / NO · fecha estimada de acceso a
-  la cuenta de MP: ______
+- **Javi (encargado) → RESPONDIDO el 2026-09-22, en vivo a Pablo:**
+  - **Reembolso: opción A + C.** Por defecto el lavado le queda **a favor** para la próxima con
+    la misma patente (automático). Si el cliente insiste con que quiere la plata, lo resuelven
+    **a mano, caso por caso** desde Mercado Pago. → O sea: `refundPayment()` **no hace falta en
+    código**; lo que hay que construir es el crédito automático.
+  - **Corte de luz en el medio: lavado completo de nuevo**, los 3 minutos enteros.
+  - **El lavado fallido NO gasta cupo diario** ("si no lavó, es como si no hubiera lavado").
+    → Desbloquea el **ADR-024 / Fase 1.5**, que estaba esperando justo esta decisión.
+  - **Cuenta de MP: sin fecha todavía.** Es lo único que bloquea. Ver `mensajes/mensaje-javi.md`.
+  - **Mesa de entrada (C1): no contestó.** Se le repregunta en el mismo mensaje.
 
 ---
 
@@ -293,6 +300,34 @@ preguntarte de nuevo):
   `/api/webhooks/mercadopago` con respuesta **200**.
 
 ---
+
+- [ ] **C2b. El "día de Mercado Pago real" — COORDINADO CON JAVI PARA EL 2026-09-23.**
+  👉 **La guía paso a paso está en `docs/guia-mercadopago-real.md`. Seguí esa, tiene los comandos
+  exactos.** Lo de abajo es el resumen de por qué.
+
+  🔴 **Lo más importante de mañana: NO cargues las credenciales en producción.** Con Mercado Pago
+  real la API no arranca si el simulador está prendido (ADR-048), y si lo apagás la máquina queda
+  OFFLINE (no hay ESP32 todavía) y nadie puede pagar: la web quedaría "fuera de servicio". La
+  prueba va **en tu compu**, donde esa guarda no corre. Producción pasa a MP real recién en D1,
+  con el hardware puesto.
+
+  1. **Dar de alta el webhook en el panel de la cuenta nueva.** 🔴 **Esto es lo que más se puede
+     pasar por alto, y es lo que más duele.** Mercado Pago avisa de un pago por dos caminos: uno
+     sale solo desde nuestro código, y el otro **hay que darlo de alta a mano en el panel de la
+     cuenta**. En la cuenta de prueba tuya ya está hecho, por eso funcionó. En la cuenta nueva
+     del dueño **va a estar vacío**, y sin eso no hay firma, y sin firma el sistema rechaza todos
+     los avisos: cada cliente esperaría hasta 2 minutos parado frente a la máquina, aunque el
+     pago esté aprobado. Panel → la aplicación → Webhooks → configurar, evento **Pagos**, y
+     copiar la **firma secreta** que te da a `MERCADOPAGO_WEBHOOK_SECRET` en Coolify.
+  2. **Verificar que llegan los DOS avisos** (inspector del túnel, `http://127.0.0.1:4040`):
+     tiene que haber dos POST por cada pago, los dos con respuesta **200**. Si ves un 401, avisá:
+     es justo lo que estoy arreglando ahora.
+  3. **Experimento de 10 minutos, y decide una pieza de código.** Sacar la línea
+     `notification_url` de la preference, pagar de nuevo, y mirar cuál de los dos avisos
+     desaparece. Si el aviso firmado (el del panel) sigue llegando solo, podemos borrar el
+     soporte del aviso viejo en vez de mantenerlo. Eso es más simple y más prolijo, pero **no se
+     puede decidir desde acá**: hay que verlo con un pago real de prueba.
+  4. Recién después, la prueba de punta a punta con la cuenta real.
 
 - [ ] **C3. Decisión de infraestructura: forzar HTTPS en `hidro-api.insolvadev.com`.** Hoy
   `http://hidro-api.insolvadev.com` responde sin redirigir a `https://` (verificado): si alguien

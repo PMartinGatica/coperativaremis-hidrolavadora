@@ -24,7 +24,8 @@ rutas de este MAPA son relativas a esa carpeta. Repo:
 | `npm run build` | shared → state-machine → api → web |
 | `npm run start:api` | API + simulador ESP32 en `:3020` |
 | `npm run dev:web` | front en `:5173` (proxy `/api` → `:3020`) |
-| `npm test` | 118 tests (shared + state-machine + api). Tardan ~9 min: corren contra PGlite real |
+| `npm test` | 140 tests (shared + state-machine + api). Tardan ~9 min: corren contra PGlite real. ⚠️ **Corrarla SOLA**: varios tests dependen de tiempos (heartbeats, esperas de 10 s) y con otra corrida de vitest en paralelo aparecen fallos que no se reproducen sueltos |
+| `npx vitest run tests/<archivo>` (desde `apps/api`) | corre UNA suite. Con 9 min de suite completa, iterar así es la diferencia entre trabajar y esperar |
 | `npm run verify` / `node scripts/verify-e2e.mjs` | E2E en vivo contra el sistema corriendo |
 | `npm run build:firmware` | `pio run -d firmware/esp32` — **la puerta (a) si tocás `firmware/`** |
 | `npm run check:firmware` | pre-chequeo estático por grep. **NO sustituye al de arriba** (daba OK con el firmware sin compilar) |
@@ -49,7 +50,8 @@ rutas de este MAPA son relativas a esa carpeta. Repo:
 | Web — cliente | `apps/web/src/pages/` | `MachinePage.tsx` (QR → patente → tarifa → pago → countdown), `PayDemoPage.tsx`, `DemoDevicePage.tsx`, `LandingPage.tsx` |
 | Web — admin | `apps/web/src/admin/` | `AdminApp.tsx` + `pages/` (Dashboard, Machines, Vehicles, Sessions, Payments, Logs, Settings) |
 | Firmware | `firmware/esp32/src/` | `main.cpp` (loop + timer local), `api_client.h` (HTTPS + HMAC + **root CA**), `app_config.h` (pines, URLs, tiempos), `peripherals.h` (relay/LED/pulsador), `nvs_store.h`, `hidro_state.h` |
-| Tests | `apps/api/tests/` | `e2e.test.ts`, `concurrency.test.ts`, `payment-flow.test.ts`, `plates.test.ts`, `device-security.test.ts`, `offline.test.ts`, `simulator-resilience.test.ts`, `admin.test.ts`, **`demo-mode.test.ts`** (MODO DEMO en producción, ADR-048), `helpers.ts` |
+| Tests | `apps/api/tests/` | `e2e.test.ts`, `concurrency.test.ts`, `payment-flow.test.ts`, `plates.test.ts`, `device-security.test.ts`, `offline.test.ts`, `simulator-resilience.test.ts`, `admin.test.ts`, `reconciliation.test.ts`, `config-guards.test.ts`, `demo-mode.test.ts` (MODO DEMO en producción, ADR-048), **`webhook-routes.test.ts`** (lo que contesta el endpoint de webhook a cada vía de MP, ADR-052 — la primera suite que le pega de verdad), `helpers.ts` |
+| Diseños de fase | `docs/designs/` | `reconciliacion-pagos.md`, `reconciliacion-pagos-ui.md`, `pin-patente-remis-socio.md`, `guardas-produccion-seed.md`, `deploy-web-estatico.md`, **`webhook-ipn-legado.md`** (ADR-052: incluye el review completo de las dos voces) |
 | Memoria de checkpoint | raíz del Mundo | `ESTADO.md` (handoff, ≤40 líneas), `MAPA.md` (este archivo), `ADR.md` (append-only), **`dashboard-data.json`** y **`tokens.csv`** — los 5 se actualizan en CADA checkpoint. **Viven acá, NO en `Madre/docs/`**: cada Mundo tiene los suyos (regla de Pablo, 2026-09-05). El `MUNDO-TEMPLATE` no traía los dos últimos, por eso faltaban |
 | Fases | `fases/` | `FASE-1.md` (borrador de alcance: reconciliación de pagos + guardas de arranque) |
 | Mensajes a terceros | `mensajes/` | `mensaje-tecnicos.md` (compra + montaje + los 3 datos que bloquean la puesta en marcha), `mensaje-dueno.md` (ADR-007 + reembolsos + cuenta de MP). Listos para copiar a WhatsApp |

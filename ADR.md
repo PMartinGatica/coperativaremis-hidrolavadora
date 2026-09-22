@@ -982,3 +982,93 @@
   ya recibe su 200 por la vía nueva y el pago se procesa una sola vez (idempotente), pero conviene
   entenderlo antes de ir a producción con plata real, por si MP cuenta esos 401 para dar de baja
   el webhook.
+
+- **2026-09-22 (ADR-052). El 401 de la vía IPN legada se cierra, pero lo que encontró el pipeline
+  buscándolo vale más que el 401: la cuenta real de Mercado Pago va a estrenarse sin el webhook
+  dado de alta, y este arreglo, mal hecho, habría convertido esa falla ruidosa en una muda.**
+  Cierra el riesgo abierto del ADR-051. Diseño en `docs/designs/webhook-ipn-legado.md`.
+  **Diagnóstico (evidencia, no deducción):** los `audit_logs` de la prueba de sandbox del
+  2026-09-20 muestran `WEBHOOK_RECEIVED` (vía firmada, procesada) a las 03:00:42.701 y
+  `WEBHOOK_INVALID {"reason":"firma HMAC inválida"}` 942 ms después: la vía legada **sí manda**
+  `x-signature`, pero no valida. No es un manifest mal armado: la doc de MP dice literalmente que
+  las notificaciones IPN, "despite receiving the x-Signature header, do not allow validation
+  through the secret key", y que IPN va a ser discontinuada. **No hay arreglo criptográfico
+  posible**, y el fallback a `body.resource` del ADR-051 solo movió el rechazo un paso más
+  adelante (antes moría por "sin payment id", ahora por firma).
+  **Tres premisas del plan original se cayeron en el review, y las tres importan:**
+  (i) *"cada pago real deja un 401"* — falso hoy: producción está en `PAYMENT_PROVIDER=demo` y
+  devuelve **404** antes de mirar firmas (`webhookRoutes.ts`). El problema aparece con la cuenta
+  real (B2), así que esto era barato-ahora, no urgente.
+  (ii) *"el riesgo es que MP dé de baja el webhook"* — **sin fuente**; se buscó y MP no documenta
+  ningún umbral de desactivación. Lo que sí documenta es que **reintenta hasta 4 días** sin
+  200/201, así que el costo real es una cola de reintentos por pago. Misma conclusión, fundamento
+  verificable. El rigor documental estaba en la conclusión y no en la premisa.
+  (iii) 🔴 *"la vía firmada va a estar ahí"* — **probablemente falsa en el debut**. Las dos vías
+  no se habilitan igual: la legada sale sola de `notification_url` (código), la firmada se da de
+  alta **a mano en el panel de la cuenta** y de ahí sale `MERCADOPAGO_WEBHOOK_SECRET`. En la
+  cuenta nueva de la cooperativa ese panel va a estar vacío: llegaría solo la vía legada, sin
+  secret, y `validateWebhook` rechaza todo. Con el fix ingenuo (200 a la legada), **todos los
+  pagos caerían al barrido en silencio** — y el barrido es de **un solo disparo**
+  (`sessionService.ts`: busca una vez al cruzar el timeout, si no encuentra deja `PAYMENT_EXPIRED`
+  y queda rescate manual). O sea: el plan original cambiaba un fallo ruidoso y auto-recuperable
+  por uno mudo y manual, justo en la configuración más probable del primer día real.
+  **Lo construido, en orden de importancia:**
+  1. **`assertProductionConfig` exige `MERCADOPAGO_WEBHOOK_SECRET` cuando el provider es
+     mercadopago** (`config.ts`): la API no arranca sin él. Ataca la raíz de (iii) en vez de
+     administrarla con una alerta — el fallo ocurre en el deploy, no con un cliente parado frente
+     a la máquina.
+  2. **Validar la firma ANTES de clasificar** (`webhookRoutes.ts`). La versión original detectaba
+     la vía legada por la forma del request antes de validar, y eso falla del lado peligroso: un
+     cambio de formato de MP o un proxy que toque el query string y se descarta en silencio una
+     notificación **firmada y legítima**. Ahora lo válido se procesa primero y la forma solo elige
+     la respuesta de lo ya rechazado: IPN esperada → **200** + `WEBHOOK_IGNORED_IPN`; falta el
+     secret → **503** a propósito (mantiene viva la cola de reintentos de MP, así que al cargar el
+     secret la notificación diferida se procesa sola); cualquier otra cosa → **401**.
+  3. **`WEBHOOK_MISSING`** (`paymentService.ts`): toda aprobación con `source !== 'webhook'` deja
+     `logger.error` + audit. ⚠️ La primera especificación de este detector era **imposible**:
+     buscaba sesiones sin `WEBHOOK_RECEIVED`, pero ese audit se escribe para TODOS los sources,
+     incluido el barrido, así que nunca podía dispararse. El `source` es el dato, no el rastro.
+  4. **`tests/webhook-routes.test.ts` (12 tests, nuevo; 140 en total, de 123)**: hasta hoy
+     **ningún** test pegaba al endpoint. El filtro de `topic` y la guarda 404 del modo demo — las dos cosas que deciden qué
+     contesta producción — nunca se habían ejercitado. Incluye las dos vías concurrentes de
+     verdad (`Promise.all`, no separadas por 942 ms) y la base caída.
+  5. Guarda de config: se movió el filtro de `topic` **debajo** de la guarda de provider (antes
+     un POST anónimo con `topic` raro recibía 200 en modo demo, desde el ADR-051).
+  **Trampa fina que casi entra:** Express usa `qs` con `allowDots:false`, así que `?data.id=X`
+  llega como la clave **literal** `'data.id'`. Leerlo como `req.query.data?.id` daría `undefined`
+  siempre y habría clasificado la vía firmada como legada — 200 mudo a notificaciones reales. Hay
+  un test dedicado.
+  **Correcciones de documentación (comentarios que mentían y ya indujeron a error):**
+  `webhookRoutes.ts` afirmaba *"Mercado Pago no re-reintenta"* (reintenta 4 días) y que MP
+  *"termina desactivando el webhook por fallar seguido"* (la premisa sin fuente);
+  `mercadoPagoProvider.ts` afirmaba que MP manda **solo** el formato legado, contradiciendo al
+  propio ADR-051. Y el test "formato legado con firma válida" de `mercadoPagoProvider.test.ts`
+  **firma él mismo** el manifest que el código espera: pasa por construcción, no porque MP firme
+  así. Quedó anotado en el test: prueba la extracción del id, no el comportamiento de MP.
+  **Proceso:** `/autoplan` con **una sola voz** — Codex sin cuota hasta el 2026-09-28
+  (`You've hit your usage limit`). Las dos voces Claude (CEO y Eng) aportaron 24 hallazgos; los
+  cuatro más duros se verificaron contra el código antes de aceptarlos. **Re-correr las fases con
+  Codex a partir del 28** (pedido de Pablo, anotado en `TODOS.md`).
+  **Decidido por Pablo en el gate:** (a) construir el paquete del webhook antes que el reencuadre
+  de "confirmación por pull" (que queda como el próximo candidato fuerte: hoy el cliente puede
+  quedar hasta 120 s mirando una pantalla quieta si el aviso no llega); (b) **no tocar** la
+  ventana anti-replay de 300 s, que el review sospecha que rompe los reintentos de la vía firmada,
+  hasta verificar con un pago real si MP reintenta con la firma original — el supuesto no está
+  verificado y no hay plata real en juego todavía.
+  **Dos correcciones de método de esta misma sesión, por honestidad del registro:** (i) se
+  anunció "136 tests verdes" antes de tener la corrida completa: el número real es **140** y la
+  primera corrida completa dio **138/140**. (ii) Uno de esos dos fallos era real y quedó
+  arreglado — el test "secret no configurado en producción" de `mercadoPagoProvider.test.ts`
+  armaba una config de producción con MP y sin secret, que es justo el estado que la guarda nueva
+  volvió imposible; se reescribió para forzar ese estado sin pasar por `loadConfig`, porque el
+  chequeo sigue valiendo como segunda línea de defensa. El otro fallo **no se reproduce** al
+  correr cada suite por separado (13 archivos, todos verdes): la corrida completa se había
+  lanzado con otras dos corridas de vitest en paralelo, y varios tests dependen de tiempos
+  (heartbeats, esperas de 10 s). **Confirmado con una corrida limpia y sola: 140/140 verdes,
+  exit 0.** Aprendizaje operativo: **la suite se corre sola**, anotado en `MAPA.md` y `ESTADO.md`.
+  **Lo que esto NO prueba:** ningún test acá prueba que Mercado Pago se comporte como se simula.
+  La verificación real es repetir la prueba de sandbox y ver **dos 200** en el inspector del
+  túnel. Checklist agrupado en `pendientes-manual.md` C2b ("el día de Mercado Pago real"), que
+  incluye el alta del webhook en el panel y un experimento de 10 minutos: sacar `notification_url`
+  y ver si la vía firmada sobrevive sola — si sobrevive, todo este soporte de IPN se borra en vez
+  de mantenerse.

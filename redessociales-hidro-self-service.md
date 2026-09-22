@@ -196,6 +196,77 @@ nadie puede pagar la tarifa de otro escribiendo su patente.
 
 ---
 
+### FASE-1 (continuación) — El aviso que nadie da de alta  ·  actualizado 2026-09-22
+
+> Sigue el mismo capítulo: preparar la máquina para el día que cobre plata de verdad. Arrancó
+> como un detalle técnico chiquito y terminó encontrando algo que iba a arruinar el día del
+> estreno.
+
+**Qué se mostró en esta fase (1 línea):** buscando un error menor apareció el problema real —
+cuando le conectemos la cuenta de cobro del dueño, el aviso de "este cliente ya pagó" no iba a
+llegar, y nadie se hubiera enterado hasta tener a un cliente enojado frente a la máquina.
+
+**Guión largo — capítulo de esta fase (para el video de 10–20 min):**
+- **Dónde quedamos / qué problema seguía abierto:** la máquina ya sabe cobrar y ya sabe
+  recuperarse de un pago lento. Faltaba un detalle feo: cada vez que alguien pagaba, el sistema
+  de pagos mandaba **dos avisos** en vez de uno, y a uno de los dos la máquina le contestaba
+  "no te entiendo". Molesto, pero nadie perdía plata. Ese era el ticket.
+- **Qué se construyó en esta fase, contado como pasos en la herramienta:**
+  1. Primero, entender por qué la máquina no entendía ese segundo aviso. Resultó que **no es un
+     error nuestro ni se puede arreglar**: es una vía vieja que la empresa de pagos mantiene por
+     compatibilidad y que, según su propia documentación, no se puede verificar. La máquina ahora
+     le contesta educadamente "recibido", lo anota, y no hace nada con él. El pago entra por el
+     aviso bueno.
+  2. Y acá apareció lo importante. Los dos avisos **no se activan igual**: uno sale solo, y el
+     otro —el bueno, el verificable— **hay que darlo de alta a mano** en la cuenta de cobro. En
+     la cuenta de prueba estaba hecho hace rato. En la cuenta del dueño, el día que nos la
+     entregue, **va a estar vacío**. O sea: el día del estreno, ningún pago avisaría a la máquina,
+     y cada cliente se quedaría hasta dos minutos esperando con el pago ya hecho.
+  3. Se resolvió de la forma más aburrida y más segura: **el sistema ahora se niega a encenderse**
+     si esa pieza falta. En vez de descubrirlo con un cliente parado frente a la máquina, se
+     descubre al instalarlo, con nosotros mirando la pantalla.
+  4. Se le agregó una alarma: cada vez que un pago se cobra pero el aviso no llegó, queda
+     anotado. Uno suelto es ruido de internet; varios seguidos significan que algo hay que
+     revisar. Antes eso pasaba sin dejar rastro.
+  5. Se escribieron las pruebas automáticas de toda esa parte, que **no existían**: ninguna
+     prueba tocaba el buzón donde llegan los avisos de pago. Ahora se prueba sola, incluso el
+     caso de los dos avisos llegando exactamente al mismo tiempo, y el de la máquina con la base
+     de datos caída.
+- **El momento "ajá":** el error que fuimos a arreglar era el menos importante de los dos. El
+  grave estaba escondido atrás, y solo apareció porque alguien preguntó "¿y esto por qué
+  funciona en la cuenta de prueba?".
+- **Qué cambia para el usuario:** nada visible hoy. Todo visible el día del estreno: el cliente
+  paga y la luz verde se prende al toque, en vez de esperar dos minutos pensando que perdió la
+  plata.
+- **Llamado a contacto (sin pitch):** si tenés un sistema que cobra y no probaste qué pasa el día
+  que cambiás de cuenta, escribime.
+
+**Short (30–45 s):**
+- **Gancho (0–3 s):** "fui a arreglar un error chiquito y encontré uno que arruinaba el día del
+  estreno."
+- **Desarrollo:** dos avisos llegando a la máquina, uno con un tilde verde y otro con una cruz.
+  Corte: "el de la cruz no se puede arreglar, es así de fábrica." Segundo corte, el giro: "pero
+  el de la tilde… **hay que darlo de alta a mano**, y en la cuenta nueva no lo está."
+- **Payoff:** pantalla de la máquina que directamente **no arranca**, con el cartel de qué falta.
+  "Prefiero que falle acá, conmigo mirando, que allá con un cliente esperando."
+- **Loop / cierre:** vuelve al plano de los dos avisos — ahora se entiende cuál era el importante.
+- **CTA:** "video completo en el canal" + "¿tu sistema de cobro sabe fallar a tiempo?"
+
+**Caption de feed (Instagram/otros):**
+- **Gancho de apertura:** el error que fui a arreglar no era el problema. El problema estaba
+  atrás.
+- **Cuerpo:** la máquina recibía dos avisos de pago y le contestaba mal a uno. Molesto, nada más.
+  Investigando apareció lo otro: el aviso que sí importa hay que activarlo a mano en cada cuenta
+  de cobro, y en la cuenta nueva del cliente iba a estar sin activar. Resultado el día del
+  estreno: cada persona esperando dos minutos con el pago hecho. Ahora el sistema no arranca si
+  esa pieza falta, y avisa cuando un pago llega por un camino que no debería.
+- **Cierre + llamado a contacto:** si tenés algo que cobra automático, la pregunta no es si
+  funciona: es qué pasa el día que cambiás de cuenta. Escribime y lo vemos.
+- **Hashtags sugeridos:** #automatizacion #pagos #cooperativa #ushuaia #sinfichas
+  #softwarehonesto
+
+---
+
 ## Checklist de cierre de fase (para este archivo)
 
 - [ ] Cabecera del Mundo escrita/al día.

@@ -6,6 +6,20 @@
 
 ## Abiertos
 
+- **[Proceso, con fecha: 2026-09-28]** Re-correr las fases CEO y Eng de `/autoplan` sobre
+  `docs/designs/webhook-ipn-legado.md` **con Codex**. El 2026-09-22 el pipeline corrió con
+  una sola voz: `codex exec` devolvió `You've hit your usage limit ... try again at Sep 28th,
+  2026`, así que no hubo contraste cruzado. El plan quedó aprobado igual (la decisión central
+  se apoya en documentación de MP y evidencia de audit_logs, no en opinión), pero la segunda
+  voz sigue pendiente. Pedido explícito de Pablo el 2026-09-22.
+  Origen: `/autoplan` sobre `webhook-ipn-legado.md`, 2026-09-22.
+
+- **[Observabilidad, Fase 1.5]** Que el aviso de "llegó un IPN huérfano" (sin su par firmado)
+  le llegue a alguien sin tener que ir a mirar el audit. Hoy queda registrado y logueado, que
+  es lo que evita la falla silenciosa, pero nadie se entera solo. Comparte el canal de
+  notificación que no existe con el ítem de abajo (el del barrido) — **se resuelven juntos, no
+  por separado**. Origen: `/autoplan` sobre `webhook-ipn-legado.md` (expansión E6), 2026-09-22.
+
 - **[Fase 1.5]** Notificar al dueño/mesa de entrada cuando el barrido recupera un pago
   automáticamente (hoy nadie se entera salvo que lo note por accidente). Requiere un
   canal de notificación que hoy no existe — fuera del blast radius de la Fase 1.

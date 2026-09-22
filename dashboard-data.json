@@ -1,7 +1,7 @@
 {
   "_meta": {
     "descripcion": "Datos del Mundo HIDRO SELF-SERVICE para el dashboard. Vive ACA, dentro del Mundo, no en Madre: cada Mundo tiene su estado, su ADR y sus archivos de periodo propios (regla de Pablo, 2026-09-05).",
-    "actualizado": "2026-09-18",
+    "actualizado": "2026-09-22",
     "estados_posibles": [
       "idea",
       "en-proceso",
@@ -38,15 +38,15 @@
     "arranque": "RETROFIT",
     "stack": "Monorepo npm workspaces (excepción: no pnpm) · Express 4 + TS strict + drizzle-orm + PGlite/Postgres (apps/api) · React 19 + Vite 6 + Tailwind 4 (apps/web) · packages/shared + state-machine · firmware ESP32 en PlatformIO/C++ · Mercado Pago tras interfaz PaymentProvider (hoy en demo) · Vitest",
     "despliegue": "HOSTNAME DEFINITIVO: hidro-api.insolvadev.com (ADR-020/021), fijado en el firmware -- no cambia al pasar a produccion. DESARROLLO: server local de Pablo (Cloudflare Tunnel -> Traefik de Coolify -> contenedor). PRODUCCION: la nube por R8, y la mudanza se hace POR DNS sin re-flashear (ADR-019). INFRA MONTADA Y VERIFICADA el 2026-09-04: el tunel frigate-nvr resulto ser LOCAL (no administrable desde Zero Trust; Cloudflare ofrece migrarlo pero es IRREVERSIBLE y sirve las camaras, NO se toco). Se agrego una linea de ingress en /etc/cloudflared/config.yml -> http://localhost:80, el mismo target que sm y studio, con backup previo; DNS = CNAME Proxied al tunel. SIN segundo tunel: R1 intacta. Camino probado ejecutando: curl al dominio devuelve el 404 de TRAEFIK (Go http.NotFound, con x-content-type-options: nosniff), no el http_status:404 del tunel -> la cadena DNS -> Cloudflare -> tunel -> Traefik esta entera y solo falta la app en Coolify. Guia lista en docs/deploy-coolify.md. Vercel DESCARTADO para la API (ADR-017).",
-    "fase_proyecto": "(2026-09-18) Fase 1 CERRADA del todo (ADR-044), desplegado y corriendo en hidro-api.insolvadev.com. 118 tests verdes. Firmware compila pero NUNCA corrio en hardware real. Novedad de hoy (ADR-047 -> ADR-048): el dueno de la cooperativa no podia ver nada entrando al link publico -- sin ESP32 fisico la maquina queda OFFLINE y el simulador estaba apagado por diseno en produccion. Se construyo el MODO DEMO: DEVICE_SIMULATOR=true prende el ESP32 simulado en produccion, con cartel amarillo MODO DEMO en la web y el flujo completo recorrible (patente -> tarifa -> pago falso -> pulsador simulado -> 180 s). Al construirlo aparecieron dos bloqueos que la causa raiz del ADR-047 no habia visto: el simulador no tenia de donde sacar el secret del dispositivo (devices.json solo se escribe al sembrar el device por primera vez -> ahora lo descifra de la base) y las autorizaciones estaban retenidas para todos los dispositivos con pagos demo en produccion (ahora se entregan SOLO al simulador in-process; un ESP32 real sigue sin recibirlas, con test que lo prueba). Guarda nueva: simulador + Mercado Pago real = la API NO arranca.",
+    "fase_proyecto": "(2026-09-22) Fase 1 CERRADA (ADR-044), corriendo en hidro-api.insolvadev.com en MODO DEMO. 140/140 tests verdes (17 nuevos). ADR-052: webhook de Mercado Pago cerrado del lado del codigo -- contesta bien las DOS vias que usa MP y la API no arranca sin MERCADOPAGO_WEBHOOK_SECRET. Firmware compila, nunca corrio en hardware real.",
     "fase_cadencia": "1-manual",
-    "sprint_actual": "test",
+    "sprint_actual": "review",
     "skill_gstack_activa": null,
     "tiene_ui": true,
     "gate": {
       "test_automatico": true,
       "test_manual": false,
-      "seguridad": false
+      "seguridad": true
     },
     "salud": "verde",
     "conexiones": [
@@ -67,7 +67,7 @@
         "estado": "pendiente"
       }
     ],
-    "proximo_paso": "[HUMANO] C4: prender DEVICE_SIMULATOR=true en las Environment Variables de Coolify y redeploy (~2 min). Despues entrar a https://hidro-api.insolvadev.com/ y confirmar el cartel MODO DEMO + HIDRO-01 Disponible, y pasarle el link al dueno para que pula la interfaz. Para que vea las 3 tarifas hay que registrar patentes remis/socio desde /admin. APAGARLA antes de conectar el ESP32 real (D1).",
+    "proximo_paso": "[HUMANO] C2b \"el dia de Mercado Pago real\": cuando el dueno entregue la cuenta (B2), dar de alta el webhook EN EL PANEL de esa cuenta (sin eso no hay firma secreta y ningun pago se avisa), verificar que llegan los dos avisos con 200, y correr el experimento de 10 min de notification_url. Sigue pendiente el feedback del dueno sobre el MODO DEMO. [AGENDA 2026-09-28] re-correr /autoplan con Codex (esta sesion corrio con una sola voz, Codex sin cuota).",
     "bloqueos": [
       "[ANTES DE DESPLEGAR] ADR-025/026: NODE_ENV=production no es opcional -- sin el, TEST_SPEED_FACTOR=10 hace que el lavado de 180 s dure 18 s y queda un ESP32 simulado corriendo en el server publico. La guia de deploy lo omitia (error propio, corregido). Ademas, sin guarda: admin por defecto admin@hidro.local con clave conocida y patentes demo remis $500 se siembran tambien en produccion. Mitigado con SEED_DEMO=false + clave propia; el arreglo real es Fase 1.",
       "[PIERDE PLATA] ADR-023: a los 120 s el barrido marca PAYMENT_EXPIRED sin preguntarle a Mercado Pago, y ese estado es TERMINAL (verificado ejecutando: TRANSITIONS vacio), asi que un webhook tardio ya no recupera nada. Los 120 s corren desde que el cliente carga la patente, no desde que abre el checkout: se dispara en un pago lento normal. Alcance de la Fase 1, borrador en fases/FASE-1.md.",
@@ -95,7 +95,7 @@
     "costo_usd": 0,
     "fecha_creacion": "2026-09-03",
     "deadline": null,
-    "ultima_actividad": "2026-09-18",
+    "ultima_actividad": "2026-09-22",
     "nota_universo": "Pago por QR para una hidrolavadora autoservicio de una cooperativa de remises de Ushuaia: patente -> tarifa ($500 remis / $2.000 socio / $8.000 particular, lo no registrado cae en la cara) -> Mercado Pago -> luz verde -> pulsador fisico -> 180 s. Maximo 2 lavados/dia por patente. Invariante duro: el pago NUNCA enciende la hidrolavadora, y el timer de 180 s lo cuenta el ESP32 localmente para que corte aunque se caiga internet. Codigo y memoria conviven en la carpeta del Mundo, con repo propio privado (ADR-012). EL BUILD LO HACE CLAUDE (ADR-008 revierte el ADR-005 'Build = DeepSeek'); gstack de punta a punta como el resto de los Mundos. Reparto con el cliente: Pablo hace software y firmware, los tecnicos hacen hardware y electrico (ADR-014). Slug de gstack: PMartinGatica-hidro-self-service.",
     "historial_estados": [
       {
@@ -147,6 +147,11 @@
         "fecha": "2026-09-05",
         "estado": "en-proceso",
         "nota": "Auditoria de seguridad del deploy, antes de exponerlo. ADR-025 (error propio): la guia docs/deploy-coolify.md omitia NODE_ENV=production y sugeria TEST_SPEED_FACTOR=10 mas DEVICE_SIMULATOR=true. Como todas las guardas cuelgan de isProd, esa combinacion hacia que el lavado de 180 s durara 18 s (el cliente paga $8.000 y recibe 18 segundos de agua) y dejaba un ESP32 simulado corriendo dentro del servidor publico, capaz de consumir autorizaciones en vez de la maquina real. Corregida. Leccion: una guia de deploy es codigo con otro nombre y su fuente de verdad es config.ts, no .env.example. ADR-026: las credenciales de admin tienen defaults conocidos que se siembran solos SIN guarda de produccion (a diferencia de JWT_SECRET), y SEED_DEMO viene en true tambien en produccion, sembrando AE100AA como remis $500. Entrar al admin y registrar patentes como remis es la via mas barata para vaciar el negocio, sin tocar el hardware. Mitigado en la guia; el arreglo real (que el arranque FALLE) entra a la Fase 1. Auditado tambien SIN bug: el camino al motor esta solido -- el pulsador valida la maquina, toma lock de fila y consume la autorizacion atomicamente, asi que doble pulsacion o replay no arrancan un segundo ciclo (ADR-001 confirmado)."
+      },
+      {
+        "fecha": "2026-09-22",
+        "estado": "en-proceso",
+        "nota": "ADR-052. Cerrado el 401 de la via IPN legada del webhook de MP, pero el hallazgo que mas importa lo encontro el pipeline buscando eso: la cuenta real de la cooperativa se va a estrenar SIN el webhook dado de alta en su panel, y el arreglo ingenuo habria convertido esa falla ruidosa en una muda (el barrido es de un solo disparo). Se ataco la raiz: la API no arranca sin MERCADOPAGO_WEBHOOK_SECRET. Primera suite HTTP del endpoint de webhook (12 tests): hasta hoy NINGUN test pegaba ahi."
       }
     ]
   }
