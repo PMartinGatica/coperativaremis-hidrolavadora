@@ -1072,3 +1072,112 @@
   incluye el alta del webhook en el panel y un experimento de 10 minutos: sacar `notification_url`
   y ver si la vía firmada sobrevive sola — si sobrevive, todo este soporte de IPN se borra en vez
   de mantenerse.
+
+- **2026-09-23 (ADR-053). C3 (forzar HTTPS) se resuelve en la app y deja de depender de una
+  decisión de infraestructura compartida — y de paso: la nota que decía "la clave viaja sin
+  cifrar" estaba exagerada.**
+  `pendientes-manual.md` C3 pedía una regla en Cloudflare, "solo para ese subdominio", advirtiendo
+  de no tocar la zona entera sin revisar qué otros servicios (las cámaras) usan `http://`. Eso
+  dejaba el pendiente esperando un rato de Pablo en un panel que además es infraestructura
+  compartida con Hermes.
+  **Lo que se verificó desde afuera (2026-09-22):** `http://hidro-api.insolvadev.com/health`
+  contesta **200 sin Location**: no redirige, confirmado. Pero en esa misma respuesta viajan dos
+  cosas que la nota no tenía en cuenta: `strict-transport-security: max-age=31536000;
+  includeSubDomains` (lo pone helmet) y un CSP con `upgrade-insecure-requests`. El frontend pega
+  a `fetch('/api' + path)` (`apps/web/src/api/client.ts:22`), o sea mismo origen y relativo: con
+  ese CSP el navegador **sube el pedido a https antes de mandarlo**, así que el POST del login no
+  sale en claro. La nota de C3 quedaba mal en ese punto puntual y se corrigió.
+  **Lo que sí seguía roto, y es lo que se arregló:** el HTML y el JS del panel sí se servían por
+  http. Un atacante en el camino puede reescribir ese JS — incluido sacarle el CSP — antes de que
+  el navegador vea ninguna defensa. Y el HSTS no tapa el agujero solo, porque el navegador lo
+  **ignora** cuando llega por http (RFC 6797 §7.2): recién protege desde la segunda visita. El
+  redirect es lo que hace que esa primera visita exista por https.
+  **Decisión: middleware propio (`createHttpsRedirect`, `http/middleware.ts`), no regla de
+  Cloudflare.** Se lee `CF-Visitor` (`{"scheme":"http"}`), el header que Cloudflare pone en su
+  edge, por la misma razón que `clientIp` usa `CF-Connecting-IP` desde el ADR-045: hay 2 capas
+  delante (túnel + Traefik) y `X-Forwarded-Proto` no es confiable ahí. No se puede falsificar
+  desde afuera porque el origen solo es alcanzable por el túnel.
+  **El bucle de redirecciones que temía A1 no es posible:** después del 301 el visitante está en
+  https, Cloudflare manda `scheme: https` y la condición deja de darse. Sin el header — local,
+  tests, LAN — no redirige nada.
+  **Alcance angosto, a propósito:** solo GET/HEAD (un 301 sobre POST lo reenvía como GET y pierde
+  el cuerpo, y el cuerpo en claro ya viajó igual), y `/api` + `/health` quedan **afuera**: son
+  clientes máquina (ESP32, webhooks de MP, monitoreo) que pueden no seguir un redirect, y ahí un
+  301 rompe en silencio. Lo que queda adentro es exactamente la superficie que lleva la clave.
+  **Redirect abierto evitado:** el destino sale de `PUBLIC_APP_URL`, no del header `Host`, que un
+  atacante controla. Hay test.
+  **10 tests nuevos** (`tests/https-redirect.test.ts`), incluidos los casos de no-redirect, que
+  son los que evitan romper cosas.
+  **Lo que esto NO cierra:** la regla de Cloudflare sigue siendo mejor en un aspecto (el pedido
+  en claro ni llega al origen). Queda como opcional, ya sin urgencia y sin bloquear nada.
+
+- **2026-09-23 (ADR-054). QA de C1 (mesa de entrada): la función existe, está bien construida y
+  **hoy no la puede usar nadie** — le falta la puerta, no la lógica. Y la suite no se daba cuenta
+  porque el test se fabricaba el token en vez de entrar por el login.**
+  Reconciliar un pago colgado está prohibido para la cuenta admin por defecto
+  (`default_admin_forbidden`, `paymentService.ts:563`), a propósito: se quiere el nombre de la
+  persona en la auditoría, no "el admin". Pero la única fila de `admin_users` que se crea es la
+  del seed, con `ADMIN_EMAIL` (`db/seed.ts:203`), y **no hay endpoint ni pantalla para dar de alta
+  una segunda** — `adminRoutes.ts` no expone ninguna. Encadenado: toda cuenta que puede entrar
+  tiene prohibido reconciliar ⇒ **si hoy se cuelga un pago real, nadie en la cooperativa lo puede
+  destrabar.** Está fijado en `tests/mesa-de-entrada.test.ts` con el login real, no con teoría.
+  **Por qué los 140 tests verdes no lo veían:** `reconciliation.test.ts:20` armaba el token con
+  `issueToken()` directo, sin crear la cuenta ni pasar por `/auth/login`. Probaba la lógica del
+  servicio (bien) y no probaba que una cuenta individual pudiera existir (el agujero). El test
+  nuevo tiene que **insertar la fila a mano con drizzle** para probar el camino feliz: esa
+  necesidad *es* la evidencia de que falta la pantalla.
+  **Lo que sí está bien y se confirmó:** la cuenta individual entra por el login real y reconcilia
+  (`approved`, sesión a `AUTHORIZED`); el email queda en la auditoría como actor de
+  `PAYMENT_AUTO_RECONCILED` (`paymentService.ts:401`), normalizado a minúsculas aunque se tipee
+  con mayúsculas — o sea, el objetivo de la regla se cumple una vez que la cuenta existe.
+  **Corrección de un diagnóstico intermedio de esta sesión:** se afirmó que la auditoría del éxito
+  guardaba `actor: 'system'` y perdía el nombre. Es falso; era el nombre de acción equivocado en
+  el test. El rastro existe.
+  **Límite conocido y aceptado a esta escala:** `requireAdmin` (`auth/adminAuth.ts`) no consulta
+  la base, así que un JWT sigue valiendo hasta vencer (12 h) aunque se borre la cuenta. Dar de
+  baja a alguien tarda hasta 12 h, o hay que rotar `JWT_SECRET` (echa a todos). Queda fijado en un
+  test para que sea decisión y no sorpresa. No se cambia ahora: a 10 lavados por día no paga su
+  costo.
+  **Lo que C1 esperaba de terceros, y lo que en realidad no dependía de nadie:** el pendiente
+  estaba archivado en la PARTE C ("depende de que consigas algo de otra persona") esperando los
+  nombres y mails de Javi. Pero los nombres solo hacen falta para **llenar** el formulario;
+  **construirlo** no depende de nadie. Queda como el próximo candidato de build, con su
+  `/office-hours` + `/autoplan` propios por ser feature nueva sobre autenticación.
+
+- **2026-09-23 (ADR-055). `/cso` sobre el cambio del día encontró lo que C1 todavía no tenía en
+  cuenta: en este sistema no existen niveles de permiso. Darle una cuenta a mesa de entrada es
+  darle el control de las tarifas.**
+  `role` se guarda en `admin_users` (`schema.ts:209`), viaja en el JWT (`adminService.ts:54`) y
+  se devuelve en `/auth/me` (`adminRoutes.ts:47`) — **y no se consulta en ningún lado para
+  autorizar**. La única barrera es `requireAdmin`, que solo verifica que el token sea válido
+  (`adminRoutes.ts:44`). O sea: toda cuenta que entra puede todo.
+  **Por qué importa justo acá:** C1 existe para que mesa de entrada pueda destrabar un pago. Con
+  el diseño actual, esa misma cuenta puede además **registrar cualquier patente como `remis`**
+  (`upsertAdminVehicle`), que es exactamente el control anti-abuso del Mundo: un auto particular
+  marcado como remis lava a $500 en vez de $8.000. También puede cambiar las tarifas y rotar el
+  secret del ESP32.
+  **Consecuencia sobre el ADR-054:** la pantalla de alta de cuentas **no es solo una pantalla**.
+  Construirla bien implica estrenar niveles de permiso que hoy no existen (una cuenta de mesa de
+  entrada que reconcilia y nada más). Eso confirma que C1 necesita su `/office-hours` +
+  `/autoplan` propios y no entra como cambio chico.
+  **No es explotable hoy:** no hay ninguna cuenta de mesa de entrada, y la única que existe es la
+  de Pablo. Es una decisión de diseño a tomar antes de crear la primera, no un agujero abierto.
+  **Crédito donde corresponde: esto no es un hallazgo nuevo.** Codex ya lo había anotado el
+  2026-09-05 en `TODOS.md` ("permiso `reconcile` dedicado, separado del rol `admin` genérico, en
+  vez de negar por email por defecto, que es configuración frágil, no identidad real"), y el
+  límite de las 12 h del JWT también estaba anotado desde el 2026-09-15. Lo que agrega este pase
+  son dos cosas: **el costo concreto** (una cuenta de mesa de entrada puede marcar patentes como
+  `remis` y romper el anti-abuso de tarifas del Mundo) y **el cambio de estado**: dejaron de ser
+  backlog y pasaron a ser bloqueantes de C1, porque C1 es justamente repartir cuentas.
+  **Otro detalle del mismo pase, menor:** `verifyToken` (`adminService.ts:61`) toma el `role` del
+  propio token con `?? 'admin'` por defecto. Hoy es inerte porque nadie lo lee para autorizar;
+  el día que se lean roles, ese default tiene que dejar de ser `admin`.
+  **Endurecimiento aplicado al redirect del ADR-053 en este mismo pase:** se descarta el pedido
+  si `originalUrl` no empieza con `/`. El parser de Node deja la URI entera cuando el pedido
+  viene en forma absoluta (`GET http://x/y HTTP/1.1`); no era un redirect abierto, porque el
+  origen ya está fijo, pero armaba un `Location` deforme. Hay test.
+  **Corrección de alcance del ADR-053, por honestidad:** el redirect **no** protege contra un
+  atacante activo en el camino durante la primera visita por http — ese atacante puede contestar
+  él mismo y nunca reenviar el pedido. Lo que el redirect logra es que la primera respuesta
+  legítima llegue por https, y ahí recién el HSTS cierra la puerta para el año siguiente. Decir
+  "C3 elimina el riesgo" sería falso; lo correcto es "achica la ventana a la primera visita".

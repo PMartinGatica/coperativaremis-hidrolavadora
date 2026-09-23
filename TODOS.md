@@ -51,11 +51,16 @@
   modifica por lo demás. Origen: Codex (voz eng de `/autoplan`), confirmado leyendo
   `sessionService.ts:56-115`, 2026-09-05.
 
-- **[Backlog, seguridad]** Permiso `reconcile` dedicado, separado del rol `admin`
-  genérico, en vez de negar por email por defecto (que es configuración frágil, no
-  identidad real). El chequeo de email por defecto que entra en la Fase 1 cierra el
-  hueco concreto encontrado; esto sería la versión robusta. Origen: Codex (voz eng),
-  2026-09-05.
+- 🔴 **[BLOQUEANTE de C1 desde 2026-09-23 — antes era backlog]** Permiso `reconcile` dedicado,
+  separado del rol `admin` genérico, en vez de negar por email por defecto (que es configuración
+  frágil, no identidad real). El chequeo de email por defecto que entra en la Fase 1 cierra el
+  hueco concreto encontrado; esto sería la versión robusta. Origen: Codex (voz eng), 2026-09-05.
+  **Actualización del 2026-09-23 (`/cso`, ADR-055):** Codex tenía razón y el costo es más alto de
+  lo que decía esta línea. `role` existe en la tabla y en el JWT pero **no se consulta para
+  autorizar en ningún endpoint**: toda cuenta admin puede además registrar cualquier patente como
+  `remis` ($500 en vez de $8.000), cambiar tarifas y rotar el secret del ESP32. Como C1 es
+  exactamente "repartir cuentas a mesa de entrada", esto dejó de ser una mejora futura: **hay que
+  resolverlo antes de crear la primera cuenta.**
 
 - **[Arquitectura, alternativa evaluada y no adoptada por ahora]** En vez de recuperar
   `PAYMENT_EXPIRED` directo a `AUTHORIZED`, Codex propuso un estado no-activo tipo
@@ -109,12 +114,15 @@
   volumen arriesgan corromper la base. Origen: `/autoplan` (voz eng) sobre
   `docs/designs/guardas-produccion-seed.md`, 2026-09-15.
 
-- **[Backlog, seguridad]** Revocar sesiones admin al rotar la clave: `verifyToken`
-  (`adminService.ts:57`) solo valida firma y vencimiento, así que un JWT emitido antes de
-  cambiar `ADMIN_PASSWORD` (o de borrar la cuenta) sigue sirviendo hasta 12 h. Fix: versión de
-  token o `passwordChangedAt` en `admin_users`, chequeado en cada request. Mientras tanto, el
-  deploy doc indica rotar `JWT_SECRET` junto con la clave tras un compromiso. Origen: `/review`
-  (especialista de seguridad) sobre ADR-038, 2026-09-15.
+- **[Backlog, seguridad — confirmado con test el 2026-09-23]** Revocar sesiones admin al rotar la
+  clave: `verifyToken` (`adminService.ts:57`) solo valida firma y vencimiento, así que un JWT
+  emitido antes de cambiar `ADMIN_PASSWORD` (o de borrar la cuenta) sigue sirviendo hasta 12 h.
+  Fix: versión de token o `passwordChangedAt` en `admin_users`, chequeado en cada request.
+  Mientras tanto, el deploy doc indica rotar `JWT_SECRET` junto con la clave tras un compromiso.
+  Origen: `/review` (especialista de seguridad) sobre ADR-038, 2026-09-15.
+  **2026-09-23:** queda fijado en `tests/mesa-de-entrada.test.ts` para que sea una decisión
+  consciente y no una sorpresa el día que haya que dar de baja a alguien de mesa de entrada.
+  Se mantiene como aceptado a esta escala (ADR-054); entra a la conversación junto con C1.
 
 - **[Hardening]** `PUBLIC_APP_URL` apuntando a `localhost` en producción no frena ni avisa: el
   QR impreso de la máquina y los `back_urls` de Mercado Pago quedarían rotos. Evaluar un warning

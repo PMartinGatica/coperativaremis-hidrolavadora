@@ -5,7 +5,11 @@
 > hacer, cómo, y cómo saber que salió bien. Andá tachando. Cuando termines uno, avisame y lo saco
 > de acá (si generó una decisión, queda su rastro en `ADR.md`).
 >
-> Última actualización: 2026-09-18. **TODA LA PARTE A ESTÁ HECHA.** Fase 1 cerrada del todo
+> Última actualización: 2026-09-23. **C3 cerrado por código — ya no te toca hacer nada ahí**
+> (ADR-053). **C1 tiene un hallazgo nuevo y fuerte: hoy nadie puede destrabar un pago colgado**
+> (ADR-054) — leelo abajo, cambia la prioridad de ese punto.
+>
+> Última actualización previa: 2026-09-18. **TODA LA PARTE A ESTÁ HECHA.** Fase 1 cerrada del todo
 > (A4b, ADR-044) y A3 cerrado encontrando y arreglando un bug real de rate-limit por IP
 > (ADR-045). **B0 ya mandado** (compras a Gaby). Falta confirmar B1/B2. **C4 decidido y
 > construido** (ADR-047 → ADR-048): el modo demo existe; te queda prender `DEVICE_SIMULATOR=true`
@@ -234,11 +238,31 @@ preguntarte de nuevo):
 
 ## PARTE C — Depende de que consigas algo de otra persona
 
-- [ ] **C1. Cuentas individuales para mesa de entrada.** Necesito que me digas: ¿cuántas
-  personas van a reconciliar pagos, y con qué email cada una? Hoy hay una sola cuenta admin (la
-  del `.env`) y está bloqueada a propósito para esto — cualquier intento con ella dice "usá tu
-  cuenta individual". Con la lista de nombres/emails, agrego la pantalla para crear esas
-  cuentas (hoy no existe).
+- [ ] **C1. Cuentas individuales para mesa de entrada. ⚠️ QA corrido el 2026-09-23: esto está
+  peor de lo que decía esta nota, y a la vez depende menos de Javi de lo que parecía** (ADR-054).
+
+  **El hallazgo, en criollo:** la función de destrabar un pago colgado está construida y anda
+  bien. Pero **hoy no la puede usar nadie, ni vos.** La única cuenta que existe es la tuya (la
+  del `.env`), y a esa cuenta el sistema le prohíbe destrabar pagos a propósito — para que quede
+  registrado el nombre de la persona que lo hizo y no un "admin" genérico. Como no hay ninguna
+  pantalla para crear una segunda cuenta, la cadena se cierra sola: **si mañana se cuelga un pago
+  real, no hay nadie habilitado para destrabarlo.**
+
+  Los 140 tests verdes no lo veían porque el test se fabricaba la credencial por adentro en vez
+  de entrar por la pantalla de login, como entra una persona. Ya está arreglado y fijado con
+  tests que sí entran por la puerta (`tests/mesa-de-entrada.test.ts`).
+
+  **Lo que cambia para vos:** esto estaba archivado acá abajo, en "depende de otra persona",
+  esperando los nombres. Pero los nombres hacen falta para **llenar** el formulario; **hacer** el
+  formulario no depende de nadie. Se puede construir ya y dejarlo esperando los datos.
+
+  **Lo que sigo necesitando de Javi (sin apuro ahora):** cuántas personas van a destrabar pagos y
+  el email de cada una. Ya está repreguntado en `mensajes/mensaje-javi.md`.
+
+  **Dato para cuando armemos las cuentas:** dar de baja a alguien tarda hasta 12 horas en surtir
+  efecto (así está construido hoy, y a esta escala está bien). Si alguna vez necesitás cortarle
+  el acceso a alguien **ya**, se cambia `JWT_SECRET` en Coolify, pero eso echa a todos y todos
+  tienen que volver a entrar.
 - [x] **C2. HECHO el 2026-09-20 — cuenta de developer + los 3 SPIKE de Mercado Pago validados
   contra la API real (sandbox), en local.** Detalle en ADR-050 y ADR-051. `createPayment()` y
   `searchByExternalReference()` funcionaban tal cual estaban escritos. **El webhook NO: tenía un
@@ -329,13 +353,35 @@ preguntarte de nuevo):
      puede decidir desde acá**: hay que verlo con un pago real de prueba.
   4. Recién después, la prueba de punta a punta con la cuenta real.
 
-- [ ] **C3. Decisión de infraestructura: forzar HTTPS en `hidro-api.insolvadev.com`.** Hoy
-  `http://hidro-api.insolvadev.com` responde sin redirigir a `https://` (verificado): si alguien
-  entra al panel por `http://`, la clave viaja sin cifrar hasta Cloudflare. Se arregla en
-  Cloudflare con una regla **solo para ese subdominio** (Configuration Rule o Page Rule "Always
-  Use HTTPS"). **No actives "Always Use HTTPS" para toda la zona** sin revisar antes qué otros
-  servicios (las cámaras, por ejemplo) usan `http://`. Es tu decisión porque toca la
-  infraestructura compartida.
+- [x] **C3. HECHO el 2026-09-23 — resuelto por código, ya no necesita que toques Cloudflare**
+  (ADR-053). Sale solo con el próximo deploy a `main`. **No tenés que hacer nada.**
+
+  Confirmado que `http://hidro-api.insolvadev.com` contestaba 200 sin redirigir. Pero revisando
+  en detalle, **la nota vieja acá exageraba en un punto y conviene que lo sepas**: decía que la
+  clave viajaba sin cifrar, y no era así. El sistema ya mandaba dos protecciones que no estaban
+  contadas, y una de ellas hace que el navegador suba el pedido del login a `https://` solo,
+  antes de mandarlo. La clave no viajaba en claro.
+
+  **Lo que sí estaba mal:** la *página* del panel (el HTML y el JavaScript) sí se servía por
+  `http://`. Ahí el riesgo no es que se lea la clave, es que alguien en el camino te cambie el
+  programa antes de que llegue a tu navegador. Eso ahora se corta: quien entre por `http://` es
+  mandado a `https://` antes de recibir nada.
+
+  Pensado para que no pueda romper nada: no toca `/api` ni `/health` (donde vive el ESP32 y los
+  avisos de Mercado Pago, que podrían no seguir un redirect), y **no puede entrar en el bucle de
+  redirecciones** que la guía de A1 te advertía. 10 tests nuevos, incluidos los que prueban
+  cuándo NO tiene que redirigir.
+
+  ⚠️ **Falta un chequeo de 10 segundos, y lo hago yo** (no vos): después del próximo deploy hay
+  que confirmar que el redirect realmente sale en producción. Si el header que usa para decidir
+  no atraviesa el túnel de Cloudflare + Traefik, el redirect **no hace nada y no avisa**. Es la
+  misma trampa del ADR-051 (el webhook que "andaba" y no andaba), así que hasta ese chequeo esto
+  está *desplegado*, no *confirmado*.
+
+  **Opcional, sin apuro y ya no bloquea nada:** la regla en Cloudflare para ese subdominio sigue
+  siendo un poco mejor (el pedido en claro ni llega al servidor). Si algún día estás en el panel,
+  Configuration Rule "Always Use HTTPS" **solo para `hidro-api.insolvadev.com`** — nunca para
+  toda la zona sin revisar antes las cámaras.
 
 - [x] **C4. HECHO el 2026-09-18 — MODO DEMO prendido y verificado en producción** (opción (a) del
   ADR-047; código en ADR-048, confirmación en ADR-049). Pablo cargó `DEVICE_SIMULATOR=true` en
