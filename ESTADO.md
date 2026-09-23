@@ -7,64 +7,45 @@
 
 1. Cargá SOLO este `ESTADO.md` + `CLAUDE.md` del Mundo. `export GSTACK_PROJECT_SLUG=
    PMartinGatica-hidro-self-service` antes de la primera skill de gstack.
-2. **Webhook de MP cerrado del lado del código (ADR-052)**, pero lo que más importa de esa sesión
-   es un pendiente humano: **la cuenta real de la cooperativa se va a estrenar sin el webhook dado
-   de alta en su panel**, y sin eso no hay firma secreta y ningún pago se avisa. Está como paso 1
-   de `pendientes-manual.md` **C2b**, que agrupa todo lo que necesita "un día de MP real".
-3. **Pendiente con fecha: re-correr `/autoplan` (CEO + Eng) con Codex a partir del 2026-09-28.**
-   El review del 2026-09-22 corrió con una sola voz (Codex sin cuota). Está en `TODOS.md`.
-4. 🔴 **Verificar C3 en producción después del deploy** (ADR-053): `curl -I
-   http://hidro-api.insolvadev.com/admin` tiene que dar **302** con `Location` en `https://`.
-   Si da 200, el header `CF-Visitor` no está llegando a través del túnel + Traefik y el redirect
-   no hace nada en silencio. **Hasta ese chequeo, C3 no está confirmado**, solo desplegado.
-5. **Dos candidatos fuertes de construcción, en este orden:**
-   (a) **C1 mesa de entrada** — ahora es más urgente: hoy **nadie puede destrabar un pago
-   colgado** (ADR-054), y construirlo bien obliga a estrenar niveles de permiso que no existen
-   (ADR-055). (b) Confirmación por pull: si el aviso de MP no llega, el cliente puede quedar
-   hasta 120 s mirando una pantalla quieta. Las dos son feature nueva: cada una con su
-   `/office-hours` + `/autoplan`.
-6. **MODO DEMO sigue prendido y verificado en producción** (ADR-048/049). Sigue esperando el
-   feedback del dueño. Para que vea las 3 tarifas hay que registrar patentes desde `/admin`.
+2. 🔴 **Verificar C3 en producción** (ADR-053): `curl -I http://hidro-api.insolvadev.com/admin`
+   tiene que dar **302** a `https://`. Si da 200, `CF-Visitor` no atraviesa el túnel + Traefik y
+   el redirect no hace nada **y no avisa** (trampa del ADR-051). Hasta ahí, C3 está desplegado,
+   no confirmado.
+3. **Próximo build: C1 mesa de entrada**, con `/office-hours` + `/autoplan` propios. Ya no espera
+   a Javi (sus nombres solo llenan el formulario). Detrás viene "confirmación por pull".
+4. **Con fecha: re-correr `/autoplan` (CEO + Eng) con Codex a partir del 2026-09-28** — el review
+   del 2026-09-22 corrió con una sola voz. Está en `TODOS.md`.
 
 ## Dónde estamos
 
-Producción corre en DEMO y no cobra plata real todavía. El webhook de Mercado Pago quedó
-contestando bien las dos vías que MP usa, con la API negándose a arrancar si falta
-`MERCADOPAGO_WEBHOOK_SECRET`, y con `WEBHOOK_MISSING` avisando cuando un pago se recupera por un
-camino que no es el webhook. El 2026-09-23 se cerró **C3** por código (redirect a https decidido
-por `CF-Visitor`, ADR-053) y se corrió el **QA de C1**, que encontró que la reconciliación de
-pagos hoy no la puede usar nadie (ADR-054) y que no hay niveles de permiso (ADR-055).
-**158/158 tests verdes** (140 + 13 de C3 + 5 de C1, corrida limpia y sola del 2026-09-23, 712 s),
-incluida la primera suite HTTP del endpoint de webhook, que no existía.
-Firmware compila, nunca corrió en hardware real.
-Cadencia: 1 (manual).
-⚠️ **La suite hay que correrla sola**: con otra corrida de vitest en paralelo aparecen fallos por
-tiempos que no se reproducen suelto (pasó el 2026-09-22 y costó una hora entenderlo).
+Producción en DEMO, sin plata real. Webhook de MP cerrado del lado del código (ADR-052): la API
+no arranca sin `MERCADOPAGO_WEBHOOK_SECRET` y `WEBHOOK_MISSING` avisa si un pago se recupera por
+otro camino. El 2026-09-23 se cerró **C3** por código y el **QA de C1** destapó dos agujeros de
+permisos (abajo). MODO DEMO verificado en producción (ADR-048/049), esperando feedback del dueño;
+para que vea las 3 tarifas hay que registrar patentes desde `/admin`.
+**158/158 tests verdes** (corrida limpia y sola, 712 s). Firmware compila, nunca corrió en
+hardware real. Cadencia: 1 (manual). ⚠️ **La suite se corre SOLA**: en paralelo con otro vitest
+aparecen fallos por tiempos que no se reproducen sueltos (2026-09-22, costó una hora).
 
 ## Riesgos abiertos (en orden de daño)
 
-- 🔴 **El alta del webhook en el panel de la cuenta nueva** (C2b paso 1). Sin eso, ningún pago se
-  avisa. La guarda de arranque lo transforma en un deploy que falla, no en un cliente esperando.
-- 🔴 **Apagar `DEVICE_SIMULATOR` antes de conectar el ESP32 real (D1)**, o conviven una máquina
-  fantasma y la real sobre HIDRO-01.
-- 🔴 **Healthcheck de Coolify apagado** mientras la base sea PGlite (TODOS.md).
-- ⚡ **ADR-015.** Polaridad del relay: probar en banco sin contactor. `[STOP-HUMANO]`.
-- **Ventana anti-replay de 300 s** (`mercadoPagoProvider.ts`): el review sospecha que rechaza los
-  reintentos de MP sobre la vía firmada y haría perder un pago real. Decisión de Pablo: no tocar
-  hasta verificarlo con un pago de prueba (está en C2b).
-- `refundPayment()` stub — política de reembolso pendiente del dueño (B2).
-- Con simulador en producción, rotar el secret desde el admin recién surte efecto al reiniciar.
+- 🔴 **Alta del webhook en el panel de la cuenta nueva** (C2b paso 1). Sin eso ningún pago se
+  avisa; la guarda de arranque lo vuelve un deploy que falla, no un cliente esperando.
 - 🔴 **Nadie puede destrabar un pago colgado** (ADR-054): la única cuenta que existe es la del
   seed y tiene prohibido reconciliar; no hay pantalla para crear una segunda (C1).
-- 🔴 **No hay niveles de permiso** (ADR-055): toda cuenta admin puede registrar patentes como
-  `remis` ($500 en vez de $8.000), cambiar tarifas y rotar el secret del ESP32. Hay que
-  resolverlo ANTES de crear la primera cuenta de mesa de entrada.
-- Un JWT de admin sigue valiendo 12 h aunque se borre la cuenta (límite aceptado a esta escala).
-- Fase 1.5 sin construir: cupo diario cuenta fallas (ADR-024); frecuencia de `PAYMENT_EXPIRED`.
-- Preferences API marcada por MP para "descontinuar" a favor de Orders API (ADR-050).
+- 🔴 **No hay niveles de permiso** (ADR-055): toda cuenta admin puede marcar patentes como
+  `remis` ($500 en vez de $8.000), cambiar tarifas y rotar el secret del ESP32. Resolverlo ANTES
+  de crear la primera cuenta de mesa de entrada. Lo anotó Codex el 2026-09-05.
+- 🔴 **Apagar `DEVICE_SIMULATOR` antes del ESP32 real (D1)**, o conviven máquina fantasma y real.
+- 🔴 **Healthcheck de Coolify apagado** mientras la base sea PGlite (TODOS.md).
+- ⚡ **ADR-015.** Polaridad del relay: probar en banco sin contactor. `[STOP-HUMANO]`.
+- **Ventana anti-replay de 300 s**: se sospecha que rechaza los reintentos de MP sobre la vía
+  firmada. Decisión de Pablo: no tocar hasta verificarlo con un pago de prueba (C2b).
+- Un JWT de admin vale 12 h aunque se borre la cuenta (aceptado a esta escala).
+- Fase 1.5 sin construir (ADR-024). `refundPayment()` ya NO hace falta: Javi eligió crédito
+  automático + caso por caso desde MP. Preferences API a discontinuar por MP (ADR-050).
 
 ## Pendientes humanos
 
-Ver `pendientes-manual.md`. Parte A y C2/C3/C4 cerradas (C3 pasó a código, ya no le toca a
-Pablo). B0 mandado; falta confirmar B1/B2. Quedan **C2b (el día de MP real, mañana con Javi)**,
-C1 (ahora es build, no espera: solo los nombres dependen de Javi), D0 y D1.
+Ver `pendientes-manual.md`. Partes A y C2/C3/C4 cerradas. B0 mandado; falta B1/B2. Quedan
+**C2b (el día de MP real con Javi)**, C1 (ya es build, no espera), D0 y D1.
