@@ -15,6 +15,7 @@ import { webhookRoutes } from './http/routes/webhookRoutes.js';
 import {
   captureRawBody,
   createGlobalRateLimit,
+  createHttpsRedirect,
   errorHandler,
   notFoundHandler,
   requestId,
@@ -45,6 +46,10 @@ export function buildApp(ctx: AppContext): Express {
   app.use(requestId);
   app.use(requestLogger(ctx.logger));
   app.use(createGlobalRateLimit());
+  // Antes de parsear el body (un redirect no lo necesita) y antes de las rutas, para que el
+  // HTML del panel nunca se sirva por http. Queda después del rate-limit por orden, no por
+  // protección: ese limiter saltea GET/HEAD a propósito, así que no cubre este camino.
+  app.use(createHttpsRedirect(ctx.config.publicAppUrl));
   app.use(express.json({ limit: '64kb', verify: captureRawBody }));
 
   app.use('/health', healthRoutes(ctx));
