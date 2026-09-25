@@ -1,19 +1,10 @@
 import { useCallback } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
-import {
-  Car,
-  Cpu,
-  CreditCard,
-  Droplets,
-  FileText,
-  LayoutDashboard,
-  ListChecks,
-  LogOut,
-  Settings,
-  WashingMachine,
-} from 'lucide-react';
+import { Car, Cpu, CreditCard, FileText, LayoutDashboard, ListChecks, LogOut, Settings, WashingMachine } from 'lucide-react';
 import { api, clearToken } from '../api/client.js';
 import { usePolling } from '../lib/usePolling.js';
+import { BRAND } from '../brand.js';
+import { BrandLogo, ThemeToggle } from '../components/ui.js';
 
 const NAV = [
   { to: '/admin', end: true, label: 'Dashboard', icon: LayoutDashboard },
@@ -21,17 +12,24 @@ const NAV = [
   { to: '/admin/vehicles', label: 'Patentes', icon: Car },
   { to: '/admin/sessions', label: 'Sesiones', icon: ListChecks },
   { to: '/admin/payments', label: 'Pagos', icon: CreditCard },
-  { to: '/admin/logs', label: 'Logs', icon: FileText },
+  { to: '/admin/logs', label: 'Registros', icon: FileText },
   { to: '/admin/settings', label: 'Ajustes', icon: Settings },
 ];
+
+const navItem = ({ isActive }: { isActive: boolean }) =>
+  `flex min-h-11 items-center gap-3 rounded-xl px-3 text-[0.95rem] transition-colors ${
+    isActive ? 'bg-primary-soft font-semibold text-primary-soft-ink' : 'text-muted hover:bg-surface-2 hover:text-ink'
+  }`;
+
+const navChip = ({ isActive }: { isActive: boolean }) =>
+  `flex min-h-10 flex-none items-center rounded-lg px-3 text-sm ${isActive ? 'bg-primary-soft font-semibold text-primary-soft-ink' : 'text-muted'}`;
 
 export default function AdminLayout() {
   const navigate = useNavigate();
 
   const loadHealth = useCallback(async () => {
     try {
-      const r = await api<{ demoMode: boolean; stats: { machinesOnline: number; machinesOffline: number; machinesDegraded: number; machinesDisabled: number } }>('/admin/overview');
-      return r;
+      return await api<{ demoMode: boolean }>('/admin/overview');
     } catch {
       return null;
     }
@@ -43,70 +41,67 @@ export default function AdminLayout() {
     navigate('/admin/login');
   }
 
+  const modeChip = overview ? (
+    overview.demoMode ? (
+      <span className="chip border-transparent bg-warn-soft text-warn">Pagos: demo</span>
+    ) : (
+      <span className="chip border-transparent bg-primary-soft text-primary-soft-ink">Pagos: Mercado Pago</span>
+    )
+  ) : null;
+
   return (
     <div className="flex min-h-screen">
-      {/* sidebar escritorio */}
-      <aside className="sticky top-0 hidden h-screen w-56 flex-none flex-col border-r border-line bg-panel/60 p-4 backdrop-blur lg:flex">
-        <Link to="/admin" className="mb-6 flex items-center gap-2 px-2">
-          <span className="grid h-8 w-8 place-items-center rounded-lg border border-aqua/40 bg-aqua/10">
-            <Droplets size={15} className="text-aqua" />
+      {/* escritorio: menú lateral */}
+      <aside className="sticky top-0 hidden h-screen w-64 flex-none flex-col gap-6 border-r border-line bg-surface px-4 py-5 lg:flex">
+        <Link to="/admin" className="flex items-center gap-3 px-1">
+          <BrandLogo size={44} />
+          <span className="min-w-0">
+            <span className="block font-display text-[0.95rem] font-semibold leading-tight">{BRAND.appName}</span>
+            <span className="block text-[0.8rem] leading-tight text-muted">{BRAND.subtitle}</span>
           </span>
-          <span className="font-display text-xs font-semibold tracking-[0.2em]">HIDRO ADMIN</span>
         </Link>
-        <nav className="space-y-1">
+        <nav aria-label="Secciones del panel" className="flex flex-col gap-0.5">
           {NAV.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors ${
-                  isActive ? 'bg-aqua/10 text-aqua' : 'text-dim hover:bg-white/5 hover:text-ink'
-                }`
-              }
-            >
-              <item.icon size={15} />
+            <NavLink key={item.to} to={item.to} end={item.end} className={navItem}>
+              <item.icon size={18} aria-hidden="true" />
               {item.label}
             </NavLink>
           ))}
         </nav>
-        <div className="mt-4 space-y-1 border-t border-line pt-4">
-          <Link to="/demo/device" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-dim hover:bg-white/5 hover:text-ink">
-            <Cpu size={15} />
-            Demo ESP32
+        <div className="mt-auto flex flex-col gap-0.5 border-t border-line pt-4">
+          <Link to="/demo/device" className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-[0.95rem] text-muted hover:bg-surface-2 hover:text-ink">
+            <Cpu size={18} aria-hidden="true" />
+            Simulador de la máquina
           </Link>
-          <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-dim hover:bg-white/5 hover:text-err" onClick={logout}>
-            <LogOut size={15} />
+          <button type="button" className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-[0.95rem] text-muted hover:bg-surface-2 hover:text-err" onClick={logout}>
+            <LogOut size={18} aria-hidden="true" />
             Salir
           </button>
         </div>
-        <div className="mt-auto pt-4 text-[0.62rem] leading-relaxed text-faint">
-          {overview?.demoMode ? 'PAGOS: DEMO' : 'PAGOS: MERCADO PAGO'}
-          <br />
-          {overview ? `ONLINE ${overview.stats.machinesOnline}/${overview.stats.machinesOnline + overview.stats.machinesOffline + overview.stats.machinesDegraded + overview.stats.machinesDisabled}` : ''}
-        </div>
       </aside>
 
-      {/* móvil: top bar */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="sticky top-0 z-40 flex items-center gap-2 overflow-x-auto border-b border-line bg-carbon/90 px-3 py-2 backdrop-blur lg:hidden">
-          <Link to="/admin" className="mr-1 flex items-center gap-1.5 font-display text-[0.7rem] font-semibold tracking-[0.15em]">
-            <Droplets size={14} className="text-aqua" /> HIDRO
-          </Link>
-          {NAV.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                `flex-none rounded-lg px-3 py-1.5 text-xs ${isActive ? 'bg-aqua/15 text-aqua' : 'text-dim'}`
-              }
-            >
-              {item.label}
-            </NavLink>
-          ))}
-          <Link to="/demo/device" className="flex-none rounded-lg px-3 py-1.5 text-xs text-dim">Demo ESP32</Link>
-          <button className="flex-none rounded-lg px-3 py-1.5 text-xs text-err" onClick={logout}>Salir</button>
+        {/* barra superior: en escritorio solo modo de pago + tema; en celular también el menú */}
+        <div className="sticky top-0 z-40 border-b border-line bg-surface">
+          <div className="flex items-center gap-3 px-4 py-2 lg:justify-end lg:px-8">
+            <Link to="/admin" className="flex items-center gap-2 lg:hidden">
+              <BrandLogo size={36} />
+              <span className="font-display text-sm font-semibold">{BRAND.appName}</span>
+            </Link>
+            <div className="ml-auto flex items-center gap-2 lg:ml-0">
+              {modeChip}
+              <ThemeToggle />
+            </div>
+          </div>
+          <nav aria-label="Secciones del panel" className="flex gap-1 overflow-x-auto px-3 pb-2 [scrollbar-width:none] lg:hidden">
+            {NAV.map((item) => (
+              <NavLink key={item.to} to={item.to} end={item.end} className={navChip}>
+                {item.label}
+              </NavLink>
+            ))}
+            <Link to="/demo/device" className="flex min-h-10 flex-none items-center rounded-lg px-3 text-sm text-muted">Simulador</Link>
+            <button type="button" className="flex min-h-10 flex-none items-center rounded-lg px-3 text-sm text-err" onClick={logout}>Salir</button>
+          </nav>
         </div>
 
         <main className="min-w-0 flex-1 px-4 py-6 lg:px-8">

@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Car, KeyRound, Plus, Trash2 } from 'lucide-react';
+import { normalizePlate } from '@hidro/shared';
 import { api, ApiError } from '../../api/client.js';
 import { usePolling } from '../../lib/usePolling.js';
 import { formatDateTime } from '../../lib/format.js';
@@ -88,11 +89,14 @@ export default function VehiclesPage() {
           <div>
             <label className="mb-1 block text-[0.65rem] uppercase tracking-[0.2em] text-faint">Patente</label>
             <input
-              className="input num text-center uppercase tracking-[0.15em]"
+              className="input plate text-center"
               value={plate}
-              onChange={(e) => setPlate(e.target.value.toUpperCase())}
-              placeholder="AE123CD"
-              maxLength={10}
+              onChange={(e) => setPlate(normalizePlate(e.target.value))}
+              placeholder="AG945RS"
+              maxLength={16}
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
             />
           </div>
           <div>
@@ -154,8 +158,8 @@ export default function VehiclesPage() {
             </thead>
             <tbody>
               {vehicles.map((v) => (
-                <tr key={v.id} className="border-b border-line/50 hover:bg-white/[0.02]">
-                  <td className="num px-4 py-3 font-semibold tracking-[0.1em]">{v.plate}</td>
+                <tr key={v.id} className="border-b border-line/50 hover:bg-surface-2">
+                  <td className="plate px-4 py-3">{v.plate}</td>
                   <td className="px-4 py-3">
                     <span className={`chip ${v.category === 'remis' ? 'text-ok border-ok/30 bg-ok/10' : 'text-aqua border-aqua/30 bg-aqua/10'}`}>
                       {CATEGORY_LABEL[v.category]}

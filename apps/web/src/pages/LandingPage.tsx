@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowRight, Cpu, Droplets, ShieldCheck } from 'lucide-react';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
+import { ArrowRight, Cpu, ShieldCheck } from 'lucide-react';
 import { api } from '../api/client.js';
 import { formatArs, formatMinutes } from '../lib/format.js';
-import { AvailabilityBadge, SimulationBanner } from '../components/ui.js';
+import { LAST_MACHINE_KEY, safeGet } from '../lib/storage.js';
+import { BRAND } from '../brand.js';
+import { AvailabilityBadge, BrandLogo, SimulationBanner, ThemeToggle } from '../components/ui.js';
 
 interface MachineListItem {
   id: string;
@@ -16,7 +18,9 @@ interface MachineListItem {
 }
 
 export default function LandingPage() {
+  const [searchParams] = useSearchParams();
   const [machines, setMachines] = useState<MachineListItem[] | null>(null);
+  const [failed, setFailed] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -30,52 +34,64 @@ export default function LandingPage() {
   useEffect(() => {
     let alive = true;
     load().then((m) => {
-      if (alive) setMachines(m);
+      if (!alive) return;
+      setMachines(m);
+      setFailed(m === null);
     });
     return () => {
       alive = false;
     };
   }, [load]);
 
+  // Abierta como app instalada (start_url "/?app=1"): ir directo a la última máquina usada.
+  const lastMachine = searchParams.get('app') === '1' ? safeGet(LAST_MACHINE_KEY) : null;
+  if (lastMachine) return <Navigate to={`/machine/${encodeURIComponent(lastMachine)}`} replace />;
+
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 pb-10 pt-10">
-      <header className="stagger mb-8 text-center">
-        <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl border border-aqua/40 bg-aqua/10 shadow-[0_0_50px_-12px_rgba(46,230,200,0.6)]">
-          <Droplets size={26} className="text-aqua" />
+    <div className="mx-auto flex min-h-screen w-full max-w-110 flex-col">
+      <header className="flex items-center gap-3 border-b border-line bg-surface px-5 py-3">
+        <BrandLogo size={44} />
+        <div className="min-w-0 flex-1">
+          <div className="font-display text-base font-semibold leading-tight">{BRAND.appName}</div>
+          <div className="text-[0.8rem] leading-tight text-muted">{BRAND.subtitle}</div>
         </div>
-        <h1 className="font-display text-3xl font-bold tracking-[0.14em]">
-          HIDRO <span className="text-aqua">SELF-SERVICE</span>
-        </h1>
-        <p className="mt-2 text-sm text-dim">
-          Lavado autoservicio para la cooperativa de remises.
-          <br />
-          Escaneá el QR de la máquina o elegila acá abajo.
-        </p>
+        <ThemeToggle />
       </header>
 
-      <main className="stagger space-y-3">
+      <main className="flex flex-1 flex-col gap-4 px-5 py-6">
+        <div>
+          <h1 className="font-display text-[1.75rem] font-semibold leading-tight tracking-tight">Lavado autoservicio</h1>
+          <p className="mt-1 text-muted">Escaneá el código QR de la máquina o elegila acá abajo.</p>
+        </div>
+
         {machines?.some((m) => m.simulatedDevice) ? <SimulationBanner /> : null}
+
         {machines === null ? (
-          <div className="card scan-zone p-10 text-center text-dim">
-            <div className="num text-xs tracking-[0.3em]">CONSULTANDO MÁQUINAS…</div>
-          </div>
+          failed ? (
+            <div role="alert" className="card p-5 text-muted">No pudimos cargar las máquinas. Revisá la conexión y recargá la página.</div>
+          ) : (
+            <div className="space-y-3" aria-busy="true">
+              <div className="skeleton h-28 rounded-2xl" />
+            </div>
+          )
+        ) : machines.length === 0 ? (
+          <div className="card p-5 text-muted">Todavía no hay máquinas disponibles.</div>
         ) : (
           machines.map((m) => (
-            <Link key={m.id} to={`/machine/${m.id}`} className="card card-hover block p-5">
+            <Link key={m.id} to={`/machine/${m.id}`} className="card card-hover block p-5" data-testid={`landing-machine-${m.id}`}>
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-[0.62rem] uppercase tracking-[0.24em] text-faint">Hidrolavadora</div>
-                  <div className="font-display text-xl font-semibold">{m.id}</div>
-                  <div className="text-xs text-dim">{m.name}</div>
+                  <div className="font-display text-lg font-semibold">{m.id}</div>
+                  <div className="text-sm text-muted">{m.name}</div>
                 </div>
                 <AvailabilityBadge availability={m.availability} />
               </div>
-              <div className="mt-4 flex items-center justify-between border-t border-line pt-3 text-xs">
-                <div className="num text-dim">
-                  {formatMinutes(m.durationSeconds)} · desde <span className="text-aqua">{formatArs(m.priceRemisArs)}</span>
+              <div className="mt-4 flex items-center justify-between border-t border-line pt-3">
+                <div className="num text-sm text-muted">
+                  {formatMinutes(m.durationSeconds)} · desde {formatArs(m.priceRemisArs)}
                 </div>
-                <span className="flex items-center gap-1 text-aqua">
-                  USAR <ArrowRight size={13} />
+                <span className="flex items-center gap-1 font-semibold text-primary">
+                  Usar <ArrowRight size={16} aria-hidden="true" />
                 </span>
               </div>
             </Link>
@@ -83,27 +99,23 @@ export default function LandingPage() {
         )}
       </main>
 
-      <footer className="mt-8 space-y-3">
+      <footer className="space-y-2 px-5 pb-8">
         {/* Sin simulador corriendo, esta pantalla no tiene nada que mostrar: se oculta en vez
             de dejarle al cliente un link que no lleva a ningún lado. */}
         {machines?.some((m) => m.simulatedDevice) ? (
-          <Link to="/demo/device" className="card card-hover flex items-center gap-3 p-4">
-            <span className="grid h-9 w-9 place-items-center rounded-xl border border-line2 bg-white/[0.03]">
-              <Cpu size={16} className="text-dim" />
-            </span>
+          <Link to="/demo/device" className="card card-hover flex min-h-14 items-center gap-3 p-4">
+            <Cpu size={18} className="text-muted" aria-hidden="true" />
             <div>
-              <div className="text-sm">Simulador de ESP32</div>
-              <div className="text-xs text-faint">Probar el sistema sin hardware físico</div>
+              <div className="font-semibold">Simulador de la máquina</div>
+              <div className="text-sm text-muted">Probar el sistema sin la máquina real</div>
             </div>
           </Link>
         ) : null}
-        <Link to="/admin" className="card card-hover flex items-center gap-3 p-4">
-          <span className="grid h-9 w-9 place-items-center rounded-xl border border-line2 bg-white/[0.03]">
-            <ShieldCheck size={16} className="text-dim" />
-          </span>
+        <Link to="/admin" className="card card-hover flex min-h-14 items-center gap-3 p-4">
+          <ShieldCheck size={18} className="text-muted" aria-hidden="true" />
           <div>
-            <div className="text-sm">Panel de administración</div>
-            <div className="text-xs text-faint">Máquinas, sesiones, pagos y logs</div>
+            <div className="font-semibold">Panel de administración</div>
+            <div className="text-sm text-muted">Solo para la cooperativa</div>
           </div>
         </Link>
       </footer>

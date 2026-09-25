@@ -85,7 +85,7 @@ export default function SessionsPage() {
             </thead>
             <tbody>
               {sessions.map((s) => (
-                <tr key={s.id} className="border-b border-line/50 transition-colors hover:bg-white/[0.02]">
+                <tr key={s.id} className="border-b border-line/50 transition-colors hover:bg-surface-2">
                   <td className="num px-4 py-3 text-xs text-dim">{formatDateTime(s.createdAt)}</td>
                   <td className="px-4 py-3">
                     <Link to={`/admin/sessions/${s.id}`} className="font-display text-aqua">{s.machineId}</Link>

@@ -25,7 +25,7 @@ const STATUS_CLS: Record<string, string> = {
   APPROVED: 'text-ok border-ok/30 bg-ok/10',
   PENDING: 'text-warn border-warn/30 bg-warn/10',
   REJECTED: 'text-err border-err/30 bg-err/10',
-  EXPIRED: 'text-dim border-line2 bg-white/5',
+  EXPIRED: 'text-dim border-line2 bg-surface-2',
   REFUNDED: 'text-aqua border-aqua/30 bg-aqua/10',
 };
 
@@ -69,7 +69,7 @@ export default function PaymentsPage() {
             </thead>
             <tbody>
               {payments.map((p) => (
-                <tr key={p.id} className="border-b border-line/50 hover:bg-white/[0.02]">
+                <tr key={p.id} className="border-b border-line/50 hover:bg-surface-2">
                   <td className="num px-4 py-3 text-xs text-dim">{formatDateTime(p.createdAt)}</td>
                   <td className="num px-4 py-3 text-xs text-dim">{p.externalPaymentId}</td>
                   <td className="px-4 py-3 text-xs">{p.provider}</td>

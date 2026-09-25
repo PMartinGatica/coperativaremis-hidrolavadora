@@ -219,7 +219,7 @@ function QrModal({ machineId, onClose }: { machineId: string; onClose: () => voi
         <div className="rounded-2xl border border-line bg-white p-4">
           {dataUrl ? <img src={dataUrl} alt={`QR de ${machineId}`} className="mx-auto w-64" /> : <div className="py-16 text-center text-sm text-dim">Generando…</div>}
         </div>
-        <div className="num break-all rounded-xl border border-line bg-white/[0.02] p-3 text-xs text-dim">{url}</div>
+        <div className="num break-all rounded-xl border border-line bg-surface-2 p-3 text-xs text-dim">{url}</div>
         <p className="text-[0.68rem] text-faint">El QR solo identifica la máquina — no contiene datos sensibles.</p>
         {dataUrl ? (
           <a className="btn btn-aqua w-full py-2.5 text-sm" href={dataUrl} download={`qr-${machineId}.png`}>

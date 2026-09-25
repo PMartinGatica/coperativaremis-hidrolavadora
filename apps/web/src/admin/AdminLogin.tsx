@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
-import { Droplets, Lock, LogIn } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Lock, LogIn } from 'lucide-react';
 import { api, ApiError, storeToken } from '../api/client.js';
+import { BRAND } from '../brand.js';
+import { BrandLogo, ThemeToggle } from '../components/ui.js';
 
 export default function AdminLogin() {
   const navigate = useNavigate();
@@ -26,40 +28,41 @@ export default function AdminLogin() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
-      <div className="stagger w-full max-w-sm">
-        <div className="mb-6 flex items-center justify-center gap-2">
-          <span className="grid h-10 w-10 place-items-center rounded-xl border border-aqua/40 bg-aqua/10">
-            <Droplets size={18} className="text-aqua" />
-          </span>
-          <span className="font-display text-sm font-semibold tracking-[0.22em]">
-            HIDRO <span className="text-aqua">ADMIN</span>
-          </span>
+    <div className="relative flex min-h-screen items-center justify-center px-4 py-10">
+      <ThemeToggle className="absolute right-4 top-4" />
+      <main className="w-full max-w-sm">
+        <div className="mb-6 flex flex-col items-center gap-3 text-center">
+          <BrandLogo size={72} />
+          <div>
+            <h1 className="font-display text-xl font-semibold">{BRAND.appName}</h1>
+            <p className="text-sm text-muted">{BRAND.subtitle} · Panel de administración</p>
+          </div>
         </div>
-        <form onSubmit={submit} className="card space-y-4 p-6">
-          <div className="flex items-center gap-2 text-sm text-dim">
-            <Lock size={14} />
-            Acceso restringido
+        <form onSubmit={submit} className="card space-y-4 p-6" data-testid="admin-login">
+          <div className="flex items-center gap-2 text-sm text-muted">
+            <Lock size={15} aria-hidden="true" />
+            Acceso solo para la cooperativa
           </div>
           <div>
-            <label className="mb-1 block text-[0.65rem] uppercase tracking-[0.2em] text-faint">Email</label>
-            <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
+            <label htmlFor="login-email" className="mb-1 block text-sm font-semibold">Email</label>
+            <input id="login-email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
           </div>
           <div>
-            <label className="mb-1 block text-[0.65rem] uppercase tracking-[0.2em] text-faint">Contraseña</label>
-            <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" placeholder="••••••••" />
+            <label htmlFor="login-password" className="mb-1 block text-sm font-semibold">Contraseña</label>
+            <input id="login-password" className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
           </div>
-          {error ? <div className="rounded-xl border border-err/30 bg-err/10 p-3 text-sm text-err">{error}</div> : null}
-          <button className="btn btn-aqua w-full py-3 text-sm" disabled={busy}>
-            <LogIn size={15} /> {busy ? 'VERIFICANDO…' : 'INGRESAR'}
+          {error ? <div role="alert" className="rounded-xl bg-err-soft p-3 text-sm text-err">{error}</div> : null}
+          <button className="btn btn-primary min-h-12 w-full text-base" disabled={busy}>
+            {busy ? <span className="spinner" aria-hidden="true" /> : <LogIn size={17} aria-hidden="true" />}
+            {busy ? 'Verificando…' : 'Ingresar'}
           </button>
           {import.meta.env.DEV ? (
-            <div className="text-center text-[0.68rem] text-faint">
+            <div className="text-center text-xs text-muted">
               Credenciales DEMO: admin@hidro.local / hidro-demo-2025
             </div>
           ) : null}
         </form>
-      </div>
+      </main>
     </div>
   );
 }

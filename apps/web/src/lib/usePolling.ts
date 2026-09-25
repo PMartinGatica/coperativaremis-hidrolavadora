@@ -1,9 +1,35 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-/** Polling ligero con cleanup (el frontend consulta al BACKEND, nunca a Mercado Pago). */
-export function usePolling<T>(fn: () => Promise<T | null>, intervalMs: number, enabled = true): T | null {
-  const [value, setValue] = useState<T | null>(null);
+export interface PollState<T> {
+  value: T | null;
+  /** Error del último intento; se limpia con el próximo que salga bien. */
+  error: unknown;
+  /** Momento (ms) del último intento que salió bien; null si todavía no hubo ninguno. */
+  lastOkAt: number | null;
+}
+
+const EMPTY: PollState<never> = { value: null, error: null, lastOkAt: null };
+
+/**
+ * Polling ligero con cleanup (el frontend consulta al BACKEND, nunca a Mercado Pago).
+ *
+ * - Siempre llama a la versión más reciente de `fn`: si `fn` cierra sobre un id que cambia
+ *   (la sesión A pasa a B con la página abierta), el próximo tick ya consulta B.
+ * - `key` reinicia el polling y vacía el valor al cambiar (no se muestra el dato de A
+ *   mientras llega el de B). Apagarlo (`enabled=false`) también lo vacía.
+ * - Un error NO borra el último valor: queda en `error` hasta el próximo intento bueno.
+ *   Así un corte de red de 1 s no hace desaparecer lo que el usuario estaba viendo.
+ */
+export function usePollingState<T>(fn: () => Promise<T | null>, intervalMs: number, enabled = true, key?: unknown): PollState<T> {
+  const fnRef = useRef(fn);
+  const [state, setState] = useState<PollState<T>>(EMPTY);
+
   useEffect(() => {
+    fnRef.current = fn;
+  });
+
+  useEffect(() => {
+    setState((s) => (s === EMPTY ? s : EMPTY));
     if (!enabled) return;
     let alive = true;
     let timer: ReturnType<typeof setTimeout>;
@@ -12,10 +38,10 @@ export function usePolling<T>(fn: () => Promise<T | null>, intervalMs: number, e
       if (!alive || inFlight) return;
       inFlight = true;
       try {
-        const v = await fn();
-        if (alive) setValue(v);
-      } catch {
-        /* reintenta en el próximo tick */
+        const v = await fnRef.current();
+        if (alive) setState({ value: v, error: null, lastOkAt: Date.now() });
+      } catch (err) {
+        if (alive) setState((s) => ({ ...s, error: err }));
       } finally {
         inFlight = false;
         if (alive) timer = setTimeout(tick, intervalMs);
@@ -26,9 +52,14 @@ export function usePolling<T>(fn: () => Promise<T | null>, intervalMs: number, e
       alive = false;
       clearTimeout(timer);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, intervalMs]);
-  return value;
+  }, [enabled, intervalMs, key]);
+
+  return state;
+}
+
+/** Igual que `usePollingState` pero devuelve solo el valor (el uso de todo el panel). */
+export function usePolling<T>(fn: () => Promise<T | null>, intervalMs: number, enabled = true, key?: unknown): T | null {
+  return usePollingState(fn, intervalMs, enabled, key).value;
 }
 
 /** Reloj de 1s sincronizado con serverTime (corrige skew del reloj del cliente). */

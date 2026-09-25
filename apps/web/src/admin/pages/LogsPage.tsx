@@ -68,7 +68,7 @@ export default function LogsPage() {
             </thead>
             <tbody>
               {logs.map((l) => (
-                <tr key={l.id} className="border-b border-line/50 hover:bg-white/[0.02]">
+                <tr key={l.id} className="border-b border-line/50 hover:bg-surface-2">
                   <td className="num px-4 py-2.5 text-xs text-dim">{formatDateTime(l.at)}</td>
                   <td className="px-4 py-2.5">
                     <span className={`chip ${l.source === 'device' ? 'text-aqua border-aqua/30 bg-aqua/10' : 'text-dim border-line2'}`}>

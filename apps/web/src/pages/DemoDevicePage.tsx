@@ -120,7 +120,7 @@ export default function DemoDevicePage() {
               <div className="chip justify-between">Estado {sim.state}</div>
             </div>
 
-            <div className="mt-4 space-y-2 rounded-xl border border-line bg-white/[0.02] p-3 text-xs text-dim">
+            <div className="mt-4 space-y-2 rounded-xl border border-line bg-surface-2 p-3 text-xs text-dim">
               <div className="flex justify-between"><span>Heartbeat</span><span className="num">{timeAgo(sim.lastHeartbeatAt)}</span></div>
               <div className="flex justify-between"><span>Uptime</span><span className="num">{sim.uptimeSeconds} s</span></div>
               <div className="flex justify-between"><span>Autorización</span><span className="num">{sim.authorizedSessionId ?? '—'}</span></div>
@@ -130,7 +130,7 @@ export default function DemoDevicePage() {
                     <span>Timer local</span>
                     <span className="num text-aqua">{formatClock(sim.timer.remainingSeconds)} / {formatClock(sim.timer.durationSeconds)}</span>
                   </div>
-                  <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/5">
+                  <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-line">
                     <div className="h-full rounded-full bg-aqua transition-all" style={{ width: `${(sim.timer.remainingSeconds / sim.timer.durationSeconds) * 100}%` }} />
                   </div>
                 </div>

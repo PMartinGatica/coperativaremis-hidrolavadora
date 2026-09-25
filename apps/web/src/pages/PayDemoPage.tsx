@@ -69,11 +69,11 @@ export default function PayDemoPage() {
           <div className="text-[0.62rem] uppercase tracking-[0.24em] text-faint">Orden de cobro DEMO</div>
           <div className="num mt-2 text-sm text-dim">{externalId}</div>
           <div className="mt-4 grid grid-cols-2 gap-3">
-            <div className="rounded-xl border border-line bg-white/[0.02] p-3">
+            <div className="rounded-xl border border-line bg-surface-2 p-3">
               <div className="text-[0.62rem] uppercase tracking-[0.2em] text-faint">Máquina</div>
               <div className="mt-1 font-display text-lg">{info?.machine?.id ?? machineId}</div>
             </div>
-            <div className="rounded-xl border border-line bg-white/[0.02] p-3">
+            <div className="rounded-xl border border-line bg-surface-2 p-3">
               <div className="text-[0.62rem] uppercase tracking-[0.2em] text-faint">Importe</div>
               <div className="num mt-1 text-lg text-aqua">{info ? formatArs(info.payment.amount) : '—'}</div>
             </div>
