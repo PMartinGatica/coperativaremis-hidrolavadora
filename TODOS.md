@@ -6,6 +6,37 @@
 
 ## Abiertos
 
+- **[Pagos/seguridad, confirmar con Pablo]** Una patente de socio/remis registrada **sin PIN
+  cargado** cobra la tarifa baja a cualquiera que sepa esa patente — `pinOk()`
+  (`machineService.ts:110`) no exige PIN cuando el vehículo no tiene uno. Preguntar: ¿todas
+  las patentes reales de socios/remises van a tener PIN? Si alguna queda sin PIN, cualquiera
+  que la sepa entra con descuento. Origen: puerta (b) manual de "Identidad visual + PWA",
+  2026-09-25 (comportamiento de antes de esta fase, no un bug del rediseño).
+
+- **[Métricas, P3]** Embudo del cliente: sesiones creadas → cotizadas → pagadas → lavadas, por
+  día y por máquina, con datos que la API ya tiene. Hoy no hay forma de saber dónde se caen
+  los clientes. Origen: `/autoplan` sobre `identidad-visual-pwa.md` (CEO C11), 2026-09-24.
+
+- **[Deuda, P3]** Borrar los alias de colores viejos (`aqua`, `panel`, `carbon`, `dim`,
+  `faint`…) página por página del panel, pasando a los nombres semánticos. Quedan como
+  puente en `index.css` desde el rediseño. Origen: `/autoplan` (CEO C12), 2026-09-24.
+
+- **[Pagos, día de MP real]** `statement_descriptor: 'HIDRO SELF-SERVICE'`
+  (`mercadoPagoProvider.ts:59`) es lo que el cliente ve en el resumen de su tarjeta.
+  Cambiarlo a la marca de la cooperativa (máx. ~22 caracteres), revisándolo con Javi. No
+  entró al rediseño porque toca el proveedor de pagos. Origen: `/autoplan` (Diseño D13),
+  2026-09-24.
+
+- **[UX, cuando la máquina esté montada]** Foto o dibujo del panel real (luz verde + botón)
+  en la pantalla "Pagaste: apretá el botón". Origen: `/autoplan` (Diseño D7), 2026-09-24.
+
+- **[CI, P3]** Correr `scripts/browser-e2e.mjs` en CI (hoy se corre a mano). Origen:
+  `/autoplan` (Eng E2), 2026-09-24.
+
+- **[Proceso]** Configurar un modelo de Codex que acepte la cuenta ChatGPT
+  (`GSTACK_CODEX_MODEL`): el 2026-09-24 `gpt-6-astra` dio HTTP 400 y `/autoplan` corrió
+  con una sola voz. Origen: `/autoplan` sobre `identidad-visual-pwa.md`, 2026-09-24.
+
 - **[Proceso, con fecha: 2026-09-28]** Re-correr las fases CEO y Eng de `/autoplan` sobre
   `docs/designs/webhook-ipn-legado.md` **con Codex**. El 2026-09-22 el pipeline corrió con
   una sola voz: `codex exec` devolvió `You've hit your usage limit ... try again at Sep 28th,

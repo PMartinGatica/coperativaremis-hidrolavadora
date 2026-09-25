@@ -1,51 +1,45 @@
 # ESTADO — MUNDO: HIDRO SELF-SERVICE
 
 > Handoff entre sesiones. Reescribir, no acumular. ≤40 líneas.
-> Última actualización: 2026-09-23 · detalle en `ADR.md` (014–055)
+> Última actualización: 2026-09-25 · detalle en `ADR.md` (014–059)
 
 ## Arranque de la próxima sesión
 
 1. Cargá SOLO este `ESTADO.md` + `CLAUDE.md` del Mundo. `export GSTACK_PROJECT_SLUG=
    PMartinGatica-hidro-self-service` antes de la primera skill de gstack.
-2. 🔴 **Verificar C3 en producción** (ADR-053): `curl -I http://hidro-api.insolvadev.com/admin`
-   tiene que dar **302** a `https://`. Si da 200, `CF-Visitor` no atraviesa el túnel + Traefik y
-   el redirect no hace nada **y no avisa** (trampa del ADR-051). Hasta ahí, C3 está desplegado,
-   no confirmado.
-3. **Próximo build: C1 mesa de entrada**, con `/office-hours` + `/autoplan` propios. Ya no espera
-   a Javi (sus nombres solo llenan el formulario). Detrás viene "confirmación por pull".
-4. **Con fecha: re-correr `/autoplan` (CEO + Eng) con Codex a partir del 2026-09-28** — el review
-   del 2026-09-22 corrió con una sola voz. Está en `TODOS.md`.
+2. **Fase "Identidad visual + app instalable": puertas (a)(c) verdes, (b) casi — falta el deploy.**
+   `/review` (2 bugs propios encontrados y arreglados: "Lavar de nuevo" cobraba $8.000 a un socio
+   sin PIN; el chip de la máquina mostraba verde con la máquina ocupada/offline) y `/cso` (0
+   hallazgos) ya corridos sobre el diff sin commitear. `qa/FASE-identidad-visual-manual.md`
+   reescrita copy-paste literal (PowerShell paso a paso) y validada a mano: pasos 1–10b y los 8
+   casos borde OK. **Faltan los pasos 11–14 (celular + versión publicada) — recién se pueden hacer
+   después del deploy.** Después: `/ship` → correr 11–14 en el celular → `/retro` → storyline en
+   `redessociales-hidro-self-service.md`. Sin commit todavía.
+3. ⚠️ **Los `.env` locales tienen `PAYMENT_PROVIDER=mercadopago`.** Para probar en local:
+   `cd apps/api && PAYMENT_PROVIDER=demo node dist/index.js`. **Para bajar ese proceso: SIEMPRE
+   Ctrl+C, nunca "Estop-Process -Force"/Finalizar tarea** — un force-kill corrompió el PGlite
+   local esta sesión (`FATAL RuntimeError` de wasm) y hubo que borrar `apps/api/.data/pg/` para
+   que se regenere sola (gitignored, sin datos reales — es seguro borrarla).
+4. **Pedirle a Pablo el logo en alta resolución** (el actual es 200×200; íconos de 512 blandos).
+5. **ADR-059 (nuevo):** el desarrollador dijo la dirección para ADR-056 — VPS Hostinger + Coolify
+   + base en Supabase Cloud. **No confirmado con Pablo, reabre la decisión cerrada del Universo**
+   ("servidor propio junto a Hermes") — avisar al Universo antes de mover algo real.
+6. Pendientes de antes: mesa de entrada / llamada con Javi (C1/C2b), decidir PIN obligatorio en
+   TODAS las patentes de socio/remis reales (`TODOS.md`, hallazgo de esta sesión), re-correr
+   `/autoplan` con Codex desde el 2026-09-28.
 
 ## Dónde estamos
 
-Producción en DEMO, sin plata real. Webhook de MP cerrado del lado del código (ADR-052): la API
-no arranca sin `MERCADOPAGO_WEBHOOK_SECRET` y `WEBHOOK_MISSING` avisa si un pago se recupera por
-otro camino. El 2026-09-23 se cerró **C3** por código y el **QA de C1** destapó dos agujeros de
-permisos (abajo). MODO DEMO verificado en producción (ADR-048/049), esperando feedback del dueño;
-para que vea las 3 tarifas hay que registrar patentes desde `/admin`.
-**158/158 tests verdes** (corrida limpia y sola, 712 s). Firmware compila, nunca corrió en
-hardware real. Cadencia: 1 (manual). ⚠️ **La suite se corre SOLA**: en paralelo con otro vitest
-aparecen fallos por tiempos que no se reproducen sueltos (2026-09-22, costó una hora).
+Producción en DEMO, sin plata real. Marca de la cooperativa (marfil `#F7F5EE` + verde `#1E7E48`),
+tema oscuro con botón y recordado, app instalable (manifest, sin service worker), patentes de 4 a
+10 caracteres, cliente y Dashboard rediseñados según el canvas. **204/204 tests + 10 nuevos de
+`apps/web` verdes**, `npm run build` y `check:bundle` verdes. Firmware NO tocado. Cadencia: 1
+(manual).
 
 ## Riesgos abiertos (en orden de daño)
 
-- 🔴 **Alta del webhook en el panel de la cuenta nueva** (C2b paso 1). Sin eso ningún pago se
-  avisa; la guarda de arranque lo vuelve un deploy que falla, no un cliente esperando.
-- 🔴 **Nadie puede destrabar un pago colgado** (ADR-054): la única cuenta que existe es la del
-  seed y tiene prohibido reconciliar; no hay pantalla para crear una segunda (C1).
-- 🔴 **No hay niveles de permiso** (ADR-055): toda cuenta admin puede marcar patentes como
-  `remis` ($500 en vez de $8.000), cambiar tarifas y rotar el secret del ESP32. Resolverlo ANTES
-  de crear la primera cuenta de mesa de entrada. Lo anotó Codex el 2026-09-05.
-- 🔴 **Apagar `DEVICE_SIMULATOR` antes del ESP32 real (D1)**, o conviven máquina fantasma y real.
-- 🔴 **Healthcheck de Coolify apagado** mientras la base sea PGlite (TODOS.md).
-- ⚡ **ADR-015.** Polaridad del relay: probar en banco sin contactor. `[STOP-HUMANO]`.
-- **Ventana anti-replay de 300 s**: se sospecha que rechaza los reintentos de MP sobre la vía
-  firmada. Decisión de Pablo: no tocar hasta verificarlo con un pago de prueba (C2b).
-- Un JWT de admin vale 12 h aunque se borre la cuenta (aceptado a esta escala).
-- Fase 1.5 sin construir (ADR-024). `refundPayment()` ya NO hace falta: Javi eligió crédito
-  automático + caso por caso desde MP. Preferences API a discontinuar por MP (ADR-050).
-
-## Pendientes humanos
-
-Ver `pendientes-manual.md`. Partes A y C2/C3/C4 cerradas. B0 mandado; falta B1/B2. Quedan
-**C2b (el día de MP real con Javi)**, C1 (ya es build, no espera), D0 y D1.
+- 🔴 Patente de socio/remis sin PIN cargado = descuento para cualquiera que sepa la patente
+  (arriba, `TODOS.md`) · Alta del webhook en el panel de MP (C2b) · pagos colgados sin niveles de
+  permiso (ADR-054/055) · apagar `DEVICE_SIMULATOR` antes del ESP32 (D1).
+- ⚡ ADR-015: polaridad del relay en banco sin contactor `[STOP-HUMANO]`. E2E del navegador no
+  corre en CI: correrlo a mano antes de deploy (`THEME=dark node scripts/browser-e2e.mjs` también).

@@ -1181,3 +1181,91 @@
   él mismo y nunca reenviar el pedido. Lo que el redirect logra es que la primera respuesta
   legítima llegue por https, y ahí recién el HSTS cierra la puerta para el año siguiente. Decir
   "C3 elimina el riesgo" sería falso; lo correcto es "achica la ventana a la primera visita".
+
+- **2026-09-23 (ADR-056). Pablo pregunta por mudar producción a Vercel + Supabase (que no viva más
+  en su server). Revisita al ADR-017: sigue en pie para la API, no aplica igual a la base.**
+  El ADR-017 (2026-09-04) ya evaluó Vercel para esta API y lo descartó por motivos que no
+  cambiaron: Express de proceso largo (no serverless), el barrido periódico de `bootstrap.ts`
+  necesita un proceso vivo (una function de Vercel no persiste entre invocaciones), y el plan
+  Hobby prohíbe uso comercial. A eso se suma lo nuevo desde entonces: el rate-limit
+  (`middleware.ts`) guarda su cupo en memoria del proceso — en funciones serverless cada
+  invocación puede caer en una instancia distinta y el cupo deja de servir para nada, el mismo
+  patrón de bug que el ADR-045 ya encontró y arregló para el problema de IP. Migrar de verdad a
+  Vercel no es "desplegar en otro lado": es reescribir el barrido como un cron externo pegándole a
+  un endpoint, y mover el rate-limit a un store compartido (Redis/Upstash). Ninguna de las dos
+  cosas está pedida ni diseñada.
+  **La base de datos es un caso distinto y ya está resuelto en el código actual:** `db/client.ts`
+  ya sabe hablar con Postgres real vía `DATABASE_URL` (hoy corre contra PGlite embebido solo
+  porque no se cargó esa variable). Mover la base a Supabase Cloud es cambiar una variable de
+  entorno, no tocar código — y coincide con la regla R8 del Universo ("lo que ve un cliente va a
+  Supabase Cloud"). Sin decidir todavía: si conviene cortar ese cambio de la migración de la API o
+  hacerlos juntos.
+  **Lo que sí resuelve "que no viva en mi server" sin reescribir nada:** un VPS en la nube
+  (DigitalOcean, Hetzner, cualquiera) corriendo el mismo Coolify + el mismo `Dockerfile` que ya
+  existe. Mismo despliegue, mismo proceso largo, mismo barrido — solo cambia dónde está la
+  máquina física. Eso sí es una migración de una tarde, no una reescritura.
+  **No se tocó código.** Esto reabre en parte la decisión cerrada del Universo ("Producción:
+  servidor propio, junto a Hermes") — corresponde confirmarlo con Pablo antes de mover nada, y si
+  se confirma, pasa por `/office-hours` + `/autoplan` como manda `<gstack-obligatorio>` porque es
+  un cambio de arquitectura, no un fix.
+
+  **Actualización del mismo día: Pablo confirma Supabase Cloud, elige VPS de Hostinger para la
+  API.** Entre Supabase Cloud (proyecto nuevo, solo para hidro) y un Postgres corriendo dentro del
+  mismo Coolify de la VPS, eligió **Supabase Cloud** — queda alineado con R8 del Universo (un
+  proyecto de Supabase por Mundo, no compartido). Para la API: VPS de Hostinger en vez de VPS
+  genérico, con el mismo Coolify + Dockerfile que ya existe (no un rewrite a Vercel).
+  **Confirmado con captura del panel: el plan de Pablo es VPS real** (pantalla de aprovisionamiento
+  con SO base + Docker), no hosting compartido/cPanel — y Hostinger ofrece **Coolify como
+  instalación de un clic** en su catálogo de apps (al lado de Dokploy/CyberPanel/CloudPanel), así
+  que el paso de `curl ... install.sh` por SSH ni hace falta: se elige "Coolify" al aprovisionar y
+  Hostinger deja la Ubuntu + Coolify listos. Ventaja ya confirmada: una VPS tiene IP pública propia,
+  así que la migración no repite el túnel de Cloudflare de `home-server` (ADR-021) — un registro A
+  directo a la IP alcanza. Sigue sin construirse nada (Pablo todavía no aprovisionó la VPS); el
+  camino técnico ya está resuelto de punta a punta, falta que lo ejecute y después el
+  `/office-hours` formal de la migración si hace falta alguna decisión más en el camino.
+
+- **2026-09-24 (ADR-057). Identidad visual aprobada: marfil + verde de la cooperativa, minimalista,
+  con modo oscuro opcional.** Pablo aprobó la propuesta del canvas
+  https://claude.ai/artifact/2RFkcFivkUJqc3SDEEYF8G (PWA del cliente + panel admin, claro/oscuro).
+  Nombre: "Hidrolavadora · Cooperativa de Remis Ushuaia". Tokens: fondo `#F7F5EE`, verde marca
+  `#1E7E48` (sacado del logo, 5:1 con blanco), oscuro `#0E1411` / verde `#43C07C`. Letras: Lexend
+  (títulos/montos) + Source Sans 3 (texto) + IBM Plex Mono (solo patentes). Fuentes consultadas:
+  ui-ux-pro-max (estilo "Minimalism & Swiss", par "Corporate Trust") y claude-webkit (anti-slop),
+  clonados fuera del repo. **Patente:** se muestra y se normaliza sin espacios (`AG945RS`); el front
+  reconoce Mercosur `AA999AA` y viejo `AAA999` como argentinas, y **cualquier otro formato se acepta
+  como patente de otro país → tarifa particular ($8.000), sin PIN**. Pendiente para el build:
+  `PLATE_REGEX` (`packages/shared/src/validation.ts`) hoy exige 6–8 alfanuméricos y rechaza
+  extranjeras más cortas/largas — ampliar el rango sin romper los tests de `plates.test.ts`. La
+  construcción pasa por `/office-hours` + `/autoplan` (tema + PWA + rebrand de `index.css`).
+
+- **2026-09-24 (ADR-058). Build de la identidad visual + app instalable, con /office-hours +
+  /autoplan (plan `docs/designs/identidad-visual-pwa.md`).** Codex no disponible (el CLI rechaza
+  el modelo `gpt-6-astra` con cuenta ChatGPT): todas las revisiones fueron de una sola voz, TODO
+  anotado. Lo que cambió respecto del canvas y por qué: (1) el PIN **no** se apaga con patentes
+  de formato no argentino, porque las motos (`A123BCD`, `123ABC`) u otro formato registrado como
+  socio pagarían $8.000; la etiqueta ar/extranjera es solo informativa y el precio lo sigue
+  decidiendo el servidor. (2) Aviso de tipeo con "Corregir patente" cuando una patente con formato
+  argentino cotiza como particular. (3) Tabla de tarifas debajo del botón. La revisión encontró
+  **tres bugs que ya existían** y se arreglaron: `usePolling` congelaba la primera función (si la
+  sesión cambiaba con la página abierta seguía consultando la vieja), un corte de red de 1 s
+  durante el lavado hacía volver la pantalla al paso 1 (el loader devolvía null ante cualquier
+  error), y una máquina inexistente quedaba "buscando" para siempre. Otras decisiones: tema en
+  `public/theme-init.js` y no inline (helmet manda `script-src 'self'`), manifest con
+  `start_url: "/?app=1"` (sin él la app instalada heredaba `?session=` de la vuelta de MP),
+  íconos PNG commiteados desde `scripts/make-icons.py` (Docker no tiene Pillow), alias de los
+  colores viejos para que todo el panel se repinte sin tocar cada página. **Hallazgo operativo:**
+  los `.env` locales tienen `PAYMENT_PROVIDER=mercadopago` (preparados para el día con Javi); el
+  E2E necesita `PAYMENT_PROVIDER=demo` en la terminal. Antes de notarlo, un clic de prueba creó
+  una preferencia de pago en la cuenta de MP configurada (sesión local `HS-FN56CC`, nadie pagó,
+  sin cargo). Verificado: render de 5 pantallas y E2E completo en navegador en claro y oscuro.
+
+- **2026-09-25 (ADR-059). Dirección elegida para ADR-056: VPS en Hostinger + Coolify (API) + base
+  en Supabase Cloud.** Dicho por el desarrollador durante la puerta (b) de esta fase, TODAVÍA sin
+  confirmar con Pablo ni pasado por `/office-hours` + `/autoplan` — no está construido, es la
+  dirección elegida entre las dos opciones que ya dejó abiertas el ADR-056 (VPS propio con el
+  mismo Coolify/Dockerfile; base movida a Supabase Cloud vía `DATABASE_URL`, sin tocar código).
+  **Reabre la decisión cerrada del Universo** ("Producción: servidor propio, junto a Hermes",
+  `CLAUDE.md` de `Madre/`) — Hostinger es un proveedor distinto del server donde vive Hermes hoy.
+  Antes de mover algo: confirmar con Pablo y avisar al Universo (no es una decisión que el Mundo
+  cierre solo). No cambia nada de esta fase (identidad visual + PWA): sigue en DEMO, sin plata
+  real, en este server.

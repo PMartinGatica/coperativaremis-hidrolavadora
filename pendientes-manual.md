@@ -7,7 +7,8 @@
 >
 > Última actualización: 2026-09-23. **C3 cerrado por código — ya no te toca hacer nada ahí**
 > (ADR-053). **C1 tiene un hallazgo nuevo y fuerte: hoy nadie puede destrabar un pago colgado**
-> (ADR-054) — leelo abajo, cambia la prioridad de ese punto.
+> (ADR-054) — leelo abajo, cambia la prioridad de ese punto. **Nueva PARTE E abajo:** contestamos
+> tu pregunta sobre mudar a Vercel + Supabase (ADR-056) y sumamos la estética de la remisería.
 >
 > Última actualización previa: 2026-09-18. **TODA LA PARTE A ESTÁ HECHA.** Fase 1 cerrada del todo
 > (A4b, ADR-044) y A3 cerrado encontrando y arreglando un bug real de rate-limit por IP
@@ -417,6 +418,53 @@ preguntarte de nuevo):
   (contactor y voltaje de bobina). El timer eléctrico viejo se deja puesto como red de seguridad
   hasta probar todo. Ojo con la caja metálica: la antena WiFi tiene que quedar montada **por
   fuera**, con el pigtail atravesando la pared — adentro no hay señal (ADR-046).
+
+---
+
+## PARTE E — Preguntas tuyas del 2026-09-23, contestadas
+
+- [ ] **E1. "¿Mudamos a Vercel + Supabase para que no viva en mi server?"** Respuesta corta:
+  **la base sí, la API no en Vercel — pero hay un camino que sí te saca del server sin
+  reescribir nada.** Detalle completo en `ADR.md` (ADR-056); acá el resumen para decidir:
+
+  - **Base de datos → Supabase Cloud: es casi gratis.** El código ya sabe hablar con Postgres
+    real (`DATABASE_URL`), hoy corre contra PGlite embebido solo porque esa variable no está
+    cargada. Cambiar a Supabase es cargar una variable en Coolify, no tocar una línea de código.
+    Además de paso destraba el Healthcheck de Coolify, que hoy está apagado a propósito porque
+    con PGlite dos copias del contenedor a la vez podrían romper la base.
+  - **API → Vercel: ya lo evaluamos el 2026-09-04 y sigue descartado (ADR-017).** La API es un
+    proceso que queda corriendo todo el tiempo (Vercel apaga y prende funciones sueltas), tiene
+    un barrido que revisa pagos colgados cada tanto (necesita un proceso vivo, no una función que
+    se apaga), y el plan gratis de Vercel prohíbe uso comercial. Migrarla de verdad implicaría
+    reescribir ese barrido como un cron externo y mover el control de "no más de tantos intentos
+    por minuto" a un servicio aparte — dos cambios grandes que hoy nadie pidió.
+  - **Lo que sí resuelve "que no viva en mi PC" sin reescribir nada:** un servidor alquilado en la
+    nube (DigitalOcean, Hetzner, cualquiera) con el mismo Coolify y el mismo Dockerfile que ya
+    existe. Es mudar la máquina, no el programa — una tarde, no una reescritura.
+
+  **No hice nada todavía.** Esto es tocar la decisión de "producción vive en mi server" que ya
+  estaba cerrada — te la devuelvo para que la confirmes vos antes de mover algo, y si decidís que
+  sí, arranca con su propio `/office-hours` como cualquier cambio de arquitectura.
+
+  **Actualización: confirmado con captura de tu panel — es VPS real, no hosting compartido, y
+  Hostinger tiene Coolify de instalación en un clic.** Ya elegiste Supabase Cloud para la base
+  (proyecto nuevo, solo para hidro). Pasos, ya sin ninguna duda técnica pendiente:
+  1. Al aprovisionar el VPS, elegí **"Coolify"** de la lista de aplicaciones (no "Ubuntu" ni
+     "cPanel") — Hostinger te deja la Ubuntu + Coolify instalados solo.
+  2. Con la IP que te da Hostinger, entrá a `http://<esa-ip>:8000` para el primer setup de Coolify
+     (crear tu usuario admin ahí, igual que la primera vez).
+  3. Conectá el mismo repo de GitHub y recreá la app: mismo Dockerfile, mismas variables de
+     entorno de siempre — cambiando `DATABASE_URL` por la que te dé Supabase.
+  4. En Cloudflare, cambiá `hidro-api.insolvadev.com` a un registro **A** directo a la IP del VPS
+     (proxied). Ya no hace falta el túnel que usabas en tu PC de casa: la VPS tiene IP pública
+     propia.
+  Sin apuro: seguís en modo DEMO, sin plata real todavía, así que no hay nada que migrar.
+
+- [ ] **E2. Adaptar la estética del sitio a la marca de la remisería.** Tarea de diseño, no
+  bloquea nada de lo demás. Para arrancar hace falta que la cooperativa/Javi pasen: logo (si
+  tienen), colores de la marca, y si hay una preferencia de tipografía o alguna foto de la
+  remisería para el fondo. Pedilo junto con los mails de mesa de entrada, no hace falta un
+  mensaje aparte.
 
 ---
 

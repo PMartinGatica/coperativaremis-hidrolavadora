@@ -1,7 +1,7 @@
 {
   "_meta": {
     "descripcion": "Datos del Mundo HIDRO SELF-SERVICE para el dashboard. Vive ACA, dentro del Mundo, no en Madre: cada Mundo tiene su estado, su ADR y sus archivos de periodo propios (regla de Pablo, 2026-09-05).",
-    "actualizado": "2026-09-23",
+    "actualizado": "2026-09-24",
     "estados_posibles": [
       "idea",
       "en-proceso",
@@ -38,7 +38,7 @@
     "arranque": "RETROFIT",
     "stack": "Monorepo npm workspaces (excepción: no pnpm) · Express 4 + TS strict + drizzle-orm + PGlite/Postgres (apps/api) · React 19 + Vite 6 + Tailwind 4 (apps/web) · packages/shared + state-machine · firmware ESP32 en PlatformIO/C++ · Mercado Pago tras interfaz PaymentProvider (hoy en demo) · Vitest",
     "despliegue": "HOSTNAME DEFINITIVO: hidro-api.insolvadev.com (ADR-020/021), fijado en el firmware -- no cambia al pasar a produccion. DESARROLLO: server local de Pablo (Cloudflare Tunnel -> Traefik de Coolify -> contenedor). PRODUCCION: la nube por R8, y la mudanza se hace POR DNS sin re-flashear (ADR-019). INFRA MONTADA Y VERIFICADA el 2026-09-04: el tunel frigate-nvr resulto ser LOCAL (no administrable desde Zero Trust; Cloudflare ofrece migrarlo pero es IRREVERSIBLE y sirve las camaras, NO se toco). Se agrego una linea de ingress en /etc/cloudflared/config.yml -> http://localhost:80, el mismo target que sm y studio, con backup previo; DNS = CNAME Proxied al tunel. SIN segundo tunel: R1 intacta. Camino probado ejecutando: curl al dominio devuelve el 404 de TRAEFIK (Go http.NotFound, con x-content-type-options: nosniff), no el http_status:404 del tunel -> la cadena DNS -> Cloudflare -> tunel -> Traefik esta entera y solo falta la app en Coolify. Guia lista en docs/deploy-coolify.md. Vercel DESCARTADO para la API (ADR-017).",
-    "fase_proyecto": "(2026-09-23) Fase 1 CERRADA (ADR-044), corriendo en hidro-api.insolvadev.com en MODO DEMO. 158/158 tests verdes. ADR-052: webhook de Mercado Pago cerrado del lado del codigo. ADR-053: C3 resuelto por codigo (redirect a https decidido por CF-Visitor) -- ya no depende de que Pablo toque Cloudflare, pero FALTA confirmarlo en produccion con curl despues del deploy: si el header no atraviesa el tunel, no hace nada y no avisa. ADR-054: el QA de mesa de entrada (C1) encontro que HOY NADIE PUEDE DESTRABAR UN PAGO COLGADO -- la unica cuenta que existe es la del seed y tiene prohibido reconciliar, y no hay pantalla para crear una segunda. ADR-055: no hay niveles de permiso (lo habia anotado Codex el 2026-09-05 y estaba como backlog); toda cuenta admin puede marcar patentes como remis y lavar a $500 en vez de $8.000, asi que hay que resolverlo ANTES de crear la primera cuenta de mesa de entrada.",
+    "fase_proyecto": "(2026-09-24) Fase \"Identidad visual + app instalable\": Build HECHO sin commit (ADR-057/058), falta /review + /cso + QA manual + /ship + /retro. Produccion sigue en MODO DEMO (Fase 1 cerrada, ADR-044). 204/204 tests verdes.",
     "fase_cadencia": "1-manual",
     "sprint_actual": "review",
     "skill_gstack_activa": null,
@@ -46,7 +46,7 @@
     "gate": {
       "test_automatico": true,
       "test_manual": false,
-      "seguridad": true
+      "seguridad": false
     },
     "salud": "verde",
     "conexiones": [
@@ -67,7 +67,7 @@
         "estado": "pendiente"
       }
     ],
-    "proximo_paso": "[HUMANO, 2026-09-23] C2b el dia de Mercado Pago real con Javi: guia paso a paso en docs/guia-mercadopago-real.md. NO cargar credenciales en produccion (dejaria la web fuera de servicio hasta el ESP32). [CLAUDE] Verificar C3 en produccion tras el deploy (curl -I http://hidro-api.insolvadev.com/admin tiene que dar 302). [BUILD, siguiente] C1 mesa de entrada con su /office-hours + /autoplan: incluye estrenar niveles de permiso (ADR-055). Los nombres/mails de Javi solo hacen falta para LLENAR el formulario, no para construirlo.",
+    "proximo_paso": "[CLAUDE] /review + /cso sobre el diff de identidad visual. [HUMANO] Correr qa/FASE-identidad-visual-manual.md y mandar el logo en alta resolucion. Despues /ship + /retro + storyline. Siguen: C2b con Javi, C1, verificar C3 en prod.",
     "bloqueos": [
       "[ANTES DE DESPLEGAR] ADR-025/026: NODE_ENV=production no es opcional -- sin el, TEST_SPEED_FACTOR=10 hace que el lavado de 180 s dure 18 s y queda un ESP32 simulado corriendo en el server publico. La guia de deploy lo omitia (error propio, corregido). Ademas, sin guarda: admin por defecto admin@hidro.local con clave conocida y patentes demo remis $500 se siembran tambien en produccion. Mitigado con SEED_DEMO=false + clave propia; el arreglo real es Fase 1.",
       "[PIERDE PLATA] ADR-023: a los 120 s el barrido marca PAYMENT_EXPIRED sin preguntarle a Mercado Pago, y ese estado es TERMINAL (verificado ejecutando: TRANSITIONS vacio), asi que un webhook tardio ya no recupera nada. Los 120 s corren desde que el cliente carga la patente, no desde que abre el checkout: se dispara en un pago lento normal. Alcance de la Fase 1, borrador en fases/FASE-1.md.",
@@ -95,7 +95,7 @@
     "costo_usd": 0,
     "fecha_creacion": "2026-09-03",
     "deadline": null,
-    "ultima_actividad": "2026-09-23",
+    "ultima_actividad": "2026-09-24",
     "nota_universo": "Pago por QR para una hidrolavadora autoservicio de una cooperativa de remises de Ushuaia: patente -> tarifa ($500 remis / $2.000 socio / $8.000 particular, lo no registrado cae en la cara) -> Mercado Pago -> luz verde -> pulsador fisico -> 180 s. Maximo 2 lavados/dia por patente. Invariante duro: el pago NUNCA enciende la hidrolavadora, y el timer de 180 s lo cuenta el ESP32 localmente para que corte aunque se caiga internet. Codigo y memoria conviven en la carpeta del Mundo, con repo propio privado (ADR-012). EL BUILD LO HACE CLAUDE (ADR-008 revierte el ADR-005 'Build = DeepSeek'); gstack de punta a punta como el resto de los Mundos. Reparto con el cliente: Pablo hace software y firmware, los tecnicos hacen hardware y electrico (ADR-014). Slug de gstack: PMartinGatica-hidro-self-service.",
     "historial_estados": [
       {
@@ -152,6 +152,16 @@
         "fecha": "2026-09-22",
         "estado": "en-proceso",
         "nota": "ADR-052. Cerrado el 401 de la via IPN legada del webhook de MP, pero el hallazgo que mas importa lo encontro el pipeline buscando eso: la cuenta real de la cooperativa se va a estrenar SIN el webhook dado de alta en su panel, y el arreglo ingenuo habria convertido esa falla ruidosa en una muda (el barrido es de un solo disparo). Se ataco la raiz: la API no arranca sin MERCADOPAGO_WEBHOOK_SECRET. Primera suite HTTP del endpoint de webhook (12 tests): hasta hoy NINGUN test pegaba ahi."
+      },
+      {
+        "fecha": "2026-09-23",
+        "estado": "en-proceso",
+        "nota": "ADR-056, sesion de checkpoint sin codigo. Pablo pregunto si convenia mudar produccion a Vercel + Supabase para no depender de su server. Se releyo el ADR-017 (2026-09-04, cuando ya se habia descartado Vercel para esta API) y se confirmo que los motivos siguen vigentes -- proceso largo de Express, el barrido periodico de bootstrap.ts necesita un proceso vivo, y se sumo un motivo nuevo desde entonces: el rate-limit de middleware.ts guarda su cupo en memoria del proceso, que en funciones serverless se pierde entre invocaciones (mismo patron de bug que el ADR-045 ya habia encontrado para el problema de IP). La base es un caso distinto: db/client.ts ya sabe hablar con Postgres real via DATABASE_URL, asi que mover la base a Supabase Cloud es cargar una variable, no tocar codigo. Camino recomendado para sacar la API del server de Pablo sin reescribir nada: un VPS en la nube con el mismo Coolify y el mismo Dockerfile. No se toco codigo; queda como decision pendiente de Pablo, documentada en ADR-056 y en pendientes-manual.md (PARTE E). Se sumo tambien un pedido nuevo, no bloqueante: adaptar la estetica del sitio a la marca de la remiseria, a la espera de assets (logo/colores) de la cooperativa."
+      },
+      {
+        "fecha": "2026-09-24",
+        "estado": "en-proceso",
+        "nota": "Identidad visual de la cooperativa (marfil + verde del logo), tema oscuro opcional, app instalable y patentes AR/extranjeras. Canvas aprobado por Pablo -> /office-hours -> /autoplan (una sola voz, Codex caido) -> Build de 10 tareas. Arreglados 3 bugs viejos del front (usePolling, corte de red en el lavado, maquina inexistente). 204/204 tests, E2E navegador claro y oscuro PASS. ADR-057/058."
       }
     ]
   }
