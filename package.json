@@ -19,7 +19,7 @@
     "start:api": "npm run start -w @hidro/api",
     "seed": "npm run seed -w @hidro/api",
     "db:generate": "npm run db:generate -w @hidro/api",
-    "test": "npm run test -w @hidro/shared && npm run test -w @hidro/state-machine && npm run test -w @hidro/api",
+    "test": "npm run test -w @hidro/shared && npm run test -w @hidro/state-machine && npm run test -w @hidro/web && npm run test -w @hidro/api",
     "test:e2e": "npm run test:e2e -w @hidro/api",
     "verify": "node scripts/verify-e2e.mjs",
     "check:firmware": "node scripts/check-firmware.mjs",
