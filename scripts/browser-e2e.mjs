@@ -6,6 +6,7 @@ const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
 const BASE = 'http://127.0.0.1:5173';
 const API = 'http://127.0.0.1:3020';
 const DEBUG_PORT = 9444;
+const THEME = process.env.THEME === 'dark' ? 'dark' : 'light';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -48,6 +49,20 @@ const clickByText = (ws, text) =>
 
 const bodyText = (ws) => evalJs(ws, `document.body ? document.body.innerText : ''`);
 
+// Selectores estables (data-testid): el texto de la UI puede cambiar sin romper la prueba.
+const exists = (ws, id) => evalJs(ws, `!!document.querySelector('[data-testid="${id}"]')`);
+const clickTestId = (ws, id) =>
+  evalJs(ws, `(() => { const el = document.querySelector('[data-testid="${id}"]'); if (!el) return 'NOT_FOUND'; el.click(); return 'CLICKED'; })()`);
+const setInput = (ws, id, value) =>
+  evalJs(ws, `(() => {
+    const input = document.querySelector('[data-testid="${id}"]');
+    if (!input) return 'NOT_FOUND';
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+    setter.call(input, ${JSON.stringify(value)});
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    return 'SET';
+  })()`);
+
 async function main() {
   let failures = 0;
   const ok = (cond, label) => {
@@ -76,28 +91,43 @@ async function main() {
     const ws = new WebSocket(tab.webSocketDebuggerUrl);
     await new Promise((r, j) => { ws.onopen = r; ws.onerror = () => j(new Error('ws')); });
 
+    // Tema: THEME=dark recorre todo el flujo en modo oscuro (el que el usuario elige con el botón).
+    if (THEME === 'dark') {
+      await evalJs(ws, `localStorage.setItem('hidro:theme', 'dark'); location.reload(); 'ok'`);
+      await sleep(1500);
+    }
+    await waitFor(async () => (await evalJs(ws, `document.documentElement.getAttribute('data-theme')`)) === THEME, `tema ${THEME}`);
+    ok(true, `la página arranca en tema ${THEME}`);
+
     console.log('[1] página de máquina');
-    await waitFor(async () => (await bodyText(ws)).includes('MÁQUINA DISPONIBLE'), 'MÁQUINA DISPONIBLE');
-    ok(true, 'cliente ve HIDRO-01 disponible (duración y tarifas)');
+    await waitFor(() => exists(ws, 'plate-input'), 'paso 1: input de patente');
+    const first = await bodyText(ws);
+    ok(first.includes('Ingresá tu patente') && first.includes('HIDRO-01'), 'cliente ve HIDRO-01 disponible y el paso 1');
+    ok(first.includes('Tarifas por lavado'), 'muestra la tabla de tarifas');
 
-    console.log('[2] ingresar patente y cotizar');
-    const setPlate = await evalJs(ws, `(() => {
-      const input = document.querySelector('input[placeholder="AE123CD"]');
-      if (!input) return 'NOT_FOUND';
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-      setter.call(input, 'AE100AA');
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      return 'SET';
-    })()`);
-    ok(setPlate === 'SET', 'escribe la patente en el input');
-    await clickByText(ws, 'VER MI TARIFA');
-    await waitFor(async () => (await bodyText(ws)).includes('REMIS DE LA COOPERATIVA'), 'tarifa cotizada');
+    console.log('[2a] patente argentina NO registrada -> aviso de tipeo');
+    ok((await setInput(ws, 'plate-input', 'zz 999-zz')) === 'SET', 'escribe una patente con separadores');
+    await clickTestId(ws, 'quote-button');
+    await waitFor(() => exists(ws, 'typo-warning'), 'aviso de tipeo');
+    const typo = await bodyText(ws);
+    ok(typo.includes('ZZ999ZZ'), 'la patente quedó normalizada (ZZ999ZZ)');
+    ok(typo.includes('$8.000'), 'cotiza como particular: $8.000');
+    await clickByText(ws, 'Corregir patente');
+    await waitFor(() => exists(ws, 'plate-input'), 'vuelve al paso 1 al corregir');
+    ok(true, '"Corregir patente" vuelve al paso 1');
+
+    console.log('[2b] patente de remis y cotizar');
+    ok((await setInput(ws, 'plate-input', 'AE100AA')) === 'SET', 'escribe la patente en el input');
+    await clickTestId(ws, 'quote-button');
+    await waitFor(() => exists(ws, 'quote-card'), 'tarifa cotizada');
     const tariff = await bodyText(ws);
+    ok(tariff.includes('Remis de la cooperativa'), 'categoría remis');
     ok(tariff.includes('$500'), 'tarifa remis: $500');
-    ok(tariff.includes('Te quedan 2 de 2 lavados hoy'), 'muestra lavados restantes del día');
+    ok(tariff.includes('0 de 2'), 'muestra lavados del día (0 de 2)');
+    ok(!(await exists(ws, 'typo-warning')), 'sin aviso de tipeo para una patente registrada');
 
-    console.log('[3] PAGAR Y HABILITAR $500');
-    await clickByText(ws, 'PAGAR Y HABILITAR $500');
+    console.log('[3] pagar $500');
+    await clickTestId(ws, 'pay-button');
     await waitFor(async () => (await bodyText(ws)).includes('SIMULAR PAGO'), 'pantalla de pago DEMO');
     const payPage = await bodyText(ws);
     ok(payPage.includes('AE100AA'), 'la pantalla de pago muestra la patente');
@@ -110,11 +140,11 @@ async function main() {
 
     console.log('[5] volver a la máquina');
     await clickByText(ws, 'VOLVER A LA MÁQUINA');
-    await waitFor(async () => (await bodyText(ws)).includes('MÁQUINA HABILITADA'), 'MÁQUINA HABILITADA');
-    ok(true, 'cliente ve MÁQUINA HABILITADA + autorización vigente');
-    const authorized = await bodyText(ws);
-    ok(authorized.includes('AUTORIZACIÓN VÁLIDA'), 'muestra countdown de autorización');
-    ok(authorized.includes('AE100AA'), 'muestra la patente en la pantalla habilitada');
+    await waitFor(() => exists(ws, 'stage-approved'), 'paso 3: pago aprobado');
+    ok(true, 'cliente ve "Pago aprobado"');
+    await waitFor(() => exists(ws, 'auth-clock'), 'cuenta de la autorización');
+    ok((await bodyText(ws)).includes('apretá el botón'), 'le dice que apriete el botón cuando vea la luz');
+    ok(!(await evalJs(ws, `location.search.includes('session=')`)), 'la dirección ya no lleva ?session= (app instalable)');
 
     console.log('[6] pulsador (simulador ESP32)');
     // Esperar a que el simulador haya RECIBIDO la autorización (LED verde = ARMED):
@@ -135,12 +165,12 @@ async function main() {
       const snap = await fetch(`${API}/api/demo/device/HIDRO-01/state`).then((x) => x.json());
       running = snap.simulator?.relayState === true;
     }
-    await waitFor(async () => (await bodyText(ws)).includes('LAVADO EN CURSO'), 'LAVADO EN CURSO', 20000);
-    ok(true, 'cliente ve LAVADO EN CURSO con countdown');
+    await waitFor(() => exists(ws, 'wash-clock'), 'lavando: cuenta regresiva', 20000);
+    ok(true, 'cliente ve la cuenta regresiva del lavado');
 
     console.log('[7] timer local -> finalizado (~18s con speed factor 10)');
-    await waitFor(async () => (await bodyText(ws)).includes('LAVADO FINALIZADO'), 'LAVADO FINALIZADO', 60000);
-    ok(true, 'cliente ve LAVADO FINALIZADO');
+    await waitFor(() => exists(ws, 'stage-finished'), 'lavado terminado', 60000);
+    ok((await bodyText(ws)).includes('¡Listo!'), 'cliente ve "¡Listo!"');
 
     console.log('[8] admin registra la sesión con patente');
     const login = await fetch(`${API}/api/admin/auth/login`, {
@@ -155,7 +185,7 @@ async function main() {
     ok(overview.stats?.revenueToday >= 500, `ingresos de hoy: $${overview.stats?.revenueToday}`);
     ok(overview.stats?.byCategory?.remis?.washes >= 1, `desglose remis: ${overview.stats?.byCategory?.remis?.washes} lavados`);
 
-    console.log(failures === 0 ? '\n=== E2E EN NAVEGADOR: PASS ===' : `\n=== ${failures} FALLOS ===`);
+    console.log(failures === 0 ? `\n=== E2E EN NAVEGADOR (${THEME}): PASS ===` : `\n=== ${failures} FALLOS (${THEME}) ===`);
     ws.close();
     process.exit(failures === 0 ? 0 : 1);
   } finally {

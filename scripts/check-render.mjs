@@ -65,11 +65,13 @@ async function main() {
       return String(text);
     }
 
+    // Textos tal como los ve el usuario (identidad visual ADR-057: oraciones, no MAYÚSCULAS).
     const checks = [
-      ['/machine/HIDRO-01', 'página cliente', ['MÁQUINA DISPONIBLE', 'HIDRO-01', 'VER MI TARIFA', 'Hidrolavadora 10 HP', 'DURACIÓN', 'TARIFAS', 'PATENTE'], 20000],
+      ['/', 'inicio', ['Hidrolavadora', 'Cooperativa de Remis · Ushuaia', 'Lavado autoservicio', 'HIDRO-01'], 9000],
+      ['/machine/HIDRO-01', 'página cliente', ['Hidrolavadora', 'HIDRO-01', 'Ingresá tu patente', 'Ver mi tarifa', 'Tarifas por lavado', 'Remis de la cooperativa', 'Particular o de otro país'], 20000],
       ['/demo/device', 'demo device', ['ESP32 SIMULADOR', 'HIDRO-01', 'PRESIONAR PULSADOR', 'SIMULAR REBOOT', 'SIMULAR CORTE DE INTERNET', 'RELAY', 'Speed factor'], 9000],
-      ['/admin/login', 'admin login', ['HIDRO', 'INGRESAR', 'admin@hidro.local'], 7000],
-      ['/dev-autologin.html', 'admin dashboard (autologin)', ['Dashboard', 'MÁQUINAS ONLINE', 'LAVADOS DE HOY', 'INGRESOS DE HOY', 'HIDRO-01', 'RELAY', 'Hidrolavadora 10 HP', 'REMIS'], 15000],
+      ['/admin/login', 'admin login', ['Hidrolavadora', 'Ingresar', 'admin@hidro.local'], 7000],
+      ['/dev-autologin.html', 'admin dashboard (autologin)', ['Dashboard', 'Máquinas en línea', 'Lavados de hoy', 'Ingresos de hoy', 'HIDRO-01', 'Relé', 'Hidrolavadora 10 HP', 'Remis de la cooperativa', 'Últimas sesiones'], 15000],
     ];
 
     let failures = 0;
