@@ -39,7 +39,7 @@ describe('seed: instalación base vs. datos demo', () => {
     await t.api.post('/api/admin/auth/login').send({ email: 'admin@test.local', password: 'admin-pass' }).expect(401);
   });
 
-  it('en producción bloquea cuentas con la clave demo y avisa por SEED_DEMO y cuentas extra, sin borrar', async () => {
+  it('en producción bloquea cuentas con la clave demo y avisa por SEED_DEMO, sin borrar', async () => {
     t = await createTestApp();
     await t.ctx.db.insert(adminUsers).values([
       { id: 'admin-viejo', email: 'viejo@test.local', passwordHash: hashSecret('otra-clave-larga'), role: 'admin' },
@@ -51,7 +51,8 @@ describe('seed: instalación base vs. datos demo', () => {
       const out = stdout.mock.calls.map(([chunk]) => String(chunk)).join('');
       expect(out).toContain('SEED_DEMO activo en producción');
       expect(out).toContain('cuentas admin con la clave demo bloqueadas');
-      expect(out).toContain('hay cuentas admin distintas de ADMIN_EMAIL');
+      // Desde el ADR-062 las cuentas de la cooperativa son lo normal: ya no hay aviso por ellas.
+      expect(out).not.toContain('hay cuentas admin distintas de ADMIN_EMAIL');
     } finally {
       stdout.mockRestore();
     }
@@ -59,9 +60,40 @@ describe('seed: instalación base vs. datos demo', () => {
     expect(rows).toHaveLength(3);
     const demoRow = rows.find((row) => row.id === 'admin-demo');
     expect(verifySecret(DEMO_ADMIN_PASSWORD, demoRow!.passwordHash)).toBe(false);
+    expect(demoRow!.tokenVersion).toBe(1); // sus sesiones abiertas también se cortan
     const oldRow = rows.find((row) => row.id === 'admin-viejo');
     expect(verifySecret('otra-clave-larga', oldRow!.passwordHash)).toBe(true);
     await t.api.post('/api/admin/auth/login').send({ email: 'admin@test.local', password: 'admin-pass' }).expect(200);
+  });
+
+  it('la cuenta de ADMIN_EMAIL se siembra como técnica, sin clave inicial pendiente (ADR-062)', async () => {
+    t = await createTestApp();
+    const [row] = await t.ctx.db.select().from(adminUsers).where(eq(adminUsers.email, 'admin@test.local'));
+    expect(row?.role).toBe('tecnico');
+    expect(row?.mustChangePassword).toBe(false);
+    expect(row?.active).toBe(true);
+  });
+
+  it('sincronizar la clave técnica desde el env corta sus sesiones abiertas (+token_version)', async () => {
+    t = await createTestApp();
+    const login = await t.api.post('/api/admin/auth/login').send({ email: 'admin@test.local', password: 'admin-pass' }).expect(200);
+    await runSeed(t.ctx.db, {
+      ...t.ctx.config,
+      seedOverrides: { ...t.ctx.config.seedOverrides, adminPassword: 'otra-clave-123' },
+    });
+    await t.api.get('/api/admin/auth/me').set('Authorization', `Bearer ${login.body.token}`).expect(401);
+  });
+
+  it('si ADMIN_EMAIL es de una cuenta NO técnica, el seed no le pisa la clave', async () => {
+    t = await createTestApp();
+    await t.ctx.db
+      .update(adminUsers)
+      .set({ role: 'admin', passwordHash: hashSecret('clave-de-javier-1') })
+      .where(eq(adminUsers.email, 'admin@test.local'));
+    await runSeed(t.ctx.db, t.ctx.config);
+    const [row] = await t.ctx.db.select().from(adminUsers).where(eq(adminUsers.email, 'admin@test.local'));
+    expect(verifySecret('clave-de-javier-1', row!.passwordHash)).toBe(true);
+    expect(row?.role).toBe('admin');
   });
 
   it('un device secret cifrado con otro DEVICE_AUTH_SECRET avisa y no se reemplaza', async () => {

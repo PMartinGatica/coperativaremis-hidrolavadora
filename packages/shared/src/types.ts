@@ -478,8 +478,7 @@ export type ReconcileResultType =
   | 'not_found'
   | 'ambiguous'
   | 'not_recoverable'
-  | 'session_id_mismatch'
-  | 'default_admin_forbidden';
+  | 'session_id_mismatch';
 
 export interface ReconcileResult {
   result: ReconcileResultType;

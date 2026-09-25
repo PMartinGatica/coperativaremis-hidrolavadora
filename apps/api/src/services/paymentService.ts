@@ -550,37 +550,13 @@ export async function refundPayment(deps: PaymentDeps, externalPaymentId: string
 // "aprobación manual" exige el ID real de pago (getPaymentById), nunca un checkbox.
 // ==================================================================================
 
-/**
- * Cuenta compartida por defecto = auditoría decorativa (Eng review, hallazgo #4): mesa
- * de entrada necesita cuentas INDIVIDUALES antes de reconciliar en producción. Chequeo
- * barato de configuración, no identidad real — la versión robusta (permiso `reconcile`
- * dedicado) queda en TODOS.md.
- */
-function isSeededDefaultAdmin(config: AppConfig, email: string): boolean {
-  return email.trim().toLowerCase() === config.adminEmail.trim().toLowerCase();
-}
-
-async function denyDefaultAdmin(deps: PaymentDeps, sessionId: string, actorEmail: string): Promise<ReconcileResult | null> {
-  if (!isSeededDefaultAdmin(deps.config, actorEmail)) return null;
-  await insertAudit(deps.db, {
-    actor: actorEmail,
-    action: 'PAYMENT_RECONCILE_DENIED',
-    entity: 'session',
-    entityId: sessionId,
-    metadata: { sessionId, reason: 'default_admin_account' },
-  });
-  return { result: 'default_admin_forbidden', sessionId };
-}
-
-/** Preámbulo común a ambos caminos de reconciliación: cuenta permitida + sesión recuperable + pago registrado. */
+/** Preámbulo común a ambos caminos de reconciliación: sesión recuperable + pago registrado.
+ *  Quién puede reconciliar lo decide el permiso `pagos.destrabar` en la ruta (ADR-062): la
+ *  cuenta técnica de Insolva no lo tiene, así la auditoría nombra a alguien de la cooperativa. */
 async function loadRecoverableSessionAndPayment(
   deps: PaymentDeps,
   sessionId: string,
-  actorEmail: string,
 ): Promise<ReconcileResult | { payment: NonNullable<Awaited<ReturnType<typeof getPaymentBySession>>> }> {
-  const denied = await denyDefaultAdmin(deps, sessionId, actorEmail);
-  if (denied) return denied;
-
   const session = await getSession(deps.db, sessionId);
   if (!session) throw new AppError('SESSION_NOT_FOUND', `Sesión no encontrada: ${sessionId}`);
   if (!isRecoverableTerminalStatus(session.status)) {
@@ -593,7 +569,7 @@ async function loadRecoverableSessionAndPayment(
 
 /** Paso 1: "reintentar automáticamente" — sin ID, sin tipeo, mesa de entrada solo aprieta un botón. */
 export async function reconcileSessionAutomatic(deps: PaymentDeps, sessionId: string, actorEmail: string): Promise<ReconcileResult> {
-  const loaded = await loadRecoverableSessionAndPayment(deps, sessionId, actorEmail);
+  const loaded = await loadRecoverableSessionAndPayment(deps, sessionId);
   if ('result' in loaded) return loaded;
   const { payment } = loaded;
 
@@ -630,7 +606,7 @@ export async function reconcileSessionManual(
   providerPaymentId: string,
   actorEmail: string,
 ): Promise<ReconcileResult> {
-  const loaded = await loadRecoverableSessionAndPayment(deps, sessionId, actorEmail);
+  const loaded = await loadRecoverableSessionAndPayment(deps, sessionId);
   if ('result' in loaded) return loaded;
   const { payment } = loaded;
 

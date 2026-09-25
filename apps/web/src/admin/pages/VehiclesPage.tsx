@@ -5,6 +5,7 @@ import { api, ApiError } from '../../api/client.js';
 import { usePolling } from '../../lib/usePolling.js';
 import { formatDateTime } from '../../lib/format.js';
 import { EmptyState } from '../../components/ui.js';
+import { ReadOnlyNote, useSession } from '../session.js';
 
 interface VehicleRow {
   id: string;
@@ -20,6 +21,8 @@ interface VehicleRow {
 const CATEGORY_LABEL: Record<string, string> = { remis: 'Remis', socio: 'Socio' };
 
 export default function VehiclesPage() {
+  const { can } = useSession();
+  const canEdit = can('patentes.editar');
   const [search, setSearch] = useState('');
   const [plate, setPlate] = useState('');
   const [category, setCategory] = useState<'remis' | 'socio'>('remis');
@@ -82,7 +85,10 @@ export default function VehiclesPage() {
         </p>
       </header>
 
+      {!canEdit ? <ReadOnlyNote /> : null}
+
       {/* alta / re-categorización */}
+      {canEdit ? (
       <form onSubmit={save} className="card space-y-3 p-5">
         <div className="text-[0.68rem] uppercase tracking-[0.24em] text-faint">Registrar patente (o cambiar su categoría)</div>
         <div className="grid gap-3 sm:grid-cols-4">
@@ -127,6 +133,7 @@ export default function VehiclesPage() {
           <Plus size={14} /> {saved ? '✓ GUARDADO' : 'GUARDAR PATENTE'}
         </button>
       </form>
+      ) : null}
 
       {/* búsqueda */}
       <div>
@@ -168,7 +175,11 @@ export default function VehiclesPage() {
                   <td className="num px-4 py-3">{v.category === 'remis' ? '$500' : '$2.000'}</td>
                   <td className="px-4 py-3 text-xs text-dim">{v.ownerName ?? '—'}</td>
                   <td className="px-4 py-3">
-                    {v.hasPin ? (
+                    {v.hasPin && !canEdit ? (
+                      <span className="chip gap-1 text-ok border-ok/30 bg-ok/10">
+                        <KeyRound size={11} /> CONFIGURADO
+                      </span>
+                    ) : v.hasPin ? (
                       <button
                         className="chip gap-1 text-ok border-ok/30 bg-ok/10"
                         onClick={() => void removePin(v)}
@@ -182,9 +193,11 @@ export default function VehiclesPage() {
                   </td>
                   <td className="num px-4 py-3 text-xs text-faint">{formatDateTime(v.createdAt)}</td>
                   <td className="px-4 py-3 text-right">
+                    {canEdit ? (
                     <button className="btn btn-danger h-8 w-8 rounded-lg" onClick={() => void remove(v.plate)} title="Eliminar registro (pasa a externo)">
                       <Trash2 size={13} />
                     </button>
+                    ) : null}
                   </td>
                 </tr>
               ))}

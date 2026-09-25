@@ -3,9 +3,9 @@ import { DemoPaymentProvider } from '../src/payments/demoProvider.js';
 import { selectSearchMatch } from '../src/payments/provider.js';
 import { processApproval } from '../src/services/paymentService.js';
 import { sweepExpired } from '../src/services/sessionService.js';
-import { issueToken } from '../src/services/adminService.js';
 import { listAuditForSession } from '../src/repositories/repos.js';
 import {
+  createPanelUser,
   createTestApp,
   PLATES,
   payAndAuthorize,
@@ -17,8 +17,9 @@ import {
 
 let t: TestCtx;
 
-function nonDefaultAdminToken(ctx: TestCtx, email = 'mesa@coop.local'): string {
-  return issueToken(ctx.ctx.config, { email, role: 'admin' });
+/** Cuenta de la cooperativa con permiso `pagos.destrabar`, creada por la puerta real (ADR-062). */
+async function nonDefaultAdminToken(ctx: TestCtx, email = 'mesa@coop.local'): Promise<string> {
+  return (await createPanelUser(ctx, { email, role: 'operador' })).token;
 }
 
 async function sessionAuditActions(ctx: TestCtx, sessionId: string): Promise<string[]> {
@@ -272,27 +273,27 @@ describe('admin: rutas de reconciliación (T5)', () => {
     await t?.close();
   });
 
-  it('cuenta admin sembrada por defecto -> default_admin_forbidden en ambas rutas', async () => {
+  it('cuenta técnica (seed) -> 403 en ambas rutas, sin tocar la sesión (ADR-062)', async () => {
     t = await createTestApp({ paymentPendingTimeoutSeconds: 120 });
     const expired = await createPendingSession(t, 'HIDRO-01');
     await forceExpire(t);
     const token = await t.api.post('/api/admin/auth/login').send({ email: 'admin@test.local', password: 'admin-pass' }).expect(200);
     const bearer = `Bearer ${(token.body as { token: string }).token}`;
-    const auto = await t.api.post(`/api/admin/sessions/${expired.sessionId}/reconcile/auto`).set('Authorization', bearer).send({}).expect(200);
-    expect(auto.body.result).toBe('default_admin_forbidden');
-    const manual = await t.api
+    const auto = await t.api.post(`/api/admin/sessions/${expired.sessionId}/reconcile/auto`).set('Authorization', bearer).send({}).expect(403);
+    expect(auto.body.error.code).toBe('FORBIDDEN');
+    await t.api
       .post(`/api/admin/sessions/${expired.sessionId}/reconcile/manual`)
       .set('Authorization', bearer)
       .send({ paymentId: 'mp-123' })
-      .expect(200);
-    expect(manual.body.result).toBe('default_admin_forbidden');
+      .expect(403);
+    expect(await sessionStatus(t, expired.sessionId)).toBe('PAYMENT_EXPIRED');
   });
 
   it('reintentar automáticamente: not_found sin pago aprobado del lado del proveedor', async () => {
     t = await createTestApp({ paymentPendingTimeoutSeconds: 120 });
     const expired = await createPendingSession(t, 'HIDRO-01');
     await forceExpire(t);
-    const bearer = `Bearer ${nonDefaultAdminToken(t)}`;
+    const bearer = `Bearer ${await nonDefaultAdminToken(t)}`;
     const res = await t.api.post(`/api/admin/sessions/${expired.sessionId}/reconcile/auto`).set('Authorization', bearer).send({}).expect(200);
     expect(res.body.result).toBe('not_found');
   });
@@ -302,7 +303,7 @@ describe('admin: rutas de reconciliación (T5)', () => {
     const expired = await createPendingSession(t, 'HIDRO-01');
     await forceExpire(t);
     (t.ctx.provider as DemoPaymentProvider).approve(expired.payment.externalPaymentId);
-    const bearer = `Bearer ${nonDefaultAdminToken(t)}`;
+    const bearer = `Bearer ${await nonDefaultAdminToken(t)}`;
     const res = await t.api.post(`/api/admin/sessions/${expired.sessionId}/reconcile/auto`).set('Authorization', bearer).send({}).expect(200);
     expect(res.body.result).toBe('approved');
     expect(await sessionStatus(t, expired.sessionId)).toBe('AUTHORIZED');
@@ -312,7 +313,7 @@ describe('admin: rutas de reconciliación (T5)', () => {
     t = await createTestApp({ paymentPendingTimeoutSeconds: 120 });
     const expired = await createPendingSession(t, 'HIDRO-01');
     await forceExpire(t);
-    const bearer = `Bearer ${nonDefaultAdminToken(t)}`;
+    const bearer = `Bearer ${await nonDefaultAdminToken(t)}`;
     const res = await t.api
       .post(`/api/admin/sessions/${expired.sessionId}/reconcile/manual`)
       .set('Authorization', bearer)
@@ -326,7 +327,7 @@ describe('admin: rutas de reconciliación (T5)', () => {
     const expired = await createPendingSession(t, 'HIDRO-01');
     await forceExpire(t);
     (t.ctx.provider as DemoPaymentProvider).approve(expired.payment.externalPaymentId);
-    const bearer = `Bearer ${nonDefaultAdminToken(t)}`;
+    const bearer = `Bearer ${await nonDefaultAdminToken(t)}`;
     const res = await t.api
       .post(`/api/admin/sessions/${expired.sessionId}/reconcile/manual`)
       .set('Authorization', bearer)
@@ -339,7 +340,7 @@ describe('admin: rutas de reconciliación (T5)', () => {
   it('sesión todavía no vencida (PAYMENT_PENDING) -> not_recoverable', async () => {
     t = await createTestApp({ paymentPendingTimeoutSeconds: 120 });
     const checkout = await createPendingSession(t, 'HIDRO-01');
-    const bearer = `Bearer ${nonDefaultAdminToken(t)}`;
+    const bearer = `Bearer ${await nonDefaultAdminToken(t)}`;
     const res = await t.api.post(`/api/admin/sessions/${checkout.sessionId}/reconcile/auto`).set('Authorization', bearer).send({}).expect(200);
     expect(res.body.result).toBe('not_recoverable');
   });
@@ -355,7 +356,7 @@ describe('admin: rutas de reconciliación (T5)', () => {
       const real = await original(id);
       return { ...real, amount: real.amount === null ? null : real.amount + 1 };
     };
-    const bearer = `Bearer ${nonDefaultAdminToken(t)}`;
+    const bearer = `Bearer ${await nonDefaultAdminToken(t)}`;
     const res = await t.api
       .post(`/api/admin/sessions/${expired.sessionId}/reconcile/manual`)
       .set('Authorization', bearer)
@@ -369,7 +370,7 @@ describe('admin: rutas de reconciliación (T5)', () => {
     t = await createTestApp({ paymentPendingTimeoutSeconds: 120 });
     const expired = await createPendingSession(t, 'HIDRO-01');
     await forceExpire(t);
-    const bearer = `Bearer ${nonDefaultAdminToken(t)}`;
+    const bearer = `Bearer ${await nonDefaultAdminToken(t)}`;
     const res = await t.api
       .post(`/api/admin/sessions/${expired.sessionId}/reconcile/manual`)
       .set('Authorization', bearer)
@@ -384,7 +385,7 @@ describe('admin: rutas de reconciliación (T5)', () => {
     const expired = await createPendingSession(t, 'HIDRO-01');
     await forceExpire(t);
     (t.ctx.provider as DemoPaymentProvider).reject(expired.payment.externalPaymentId);
-    const bearer = `Bearer ${nonDefaultAdminToken(t)}`;
+    const bearer = `Bearer ${await nonDefaultAdminToken(t)}`;
     const res = await t.api
       .post(`/api/admin/sessions/${expired.sessionId}/reconcile/manual`)
       .set('Authorization', bearer)
@@ -399,7 +400,7 @@ describe('admin: rutas de reconciliación (T5)', () => {
     const expired = await createPendingSession(t, 'HIDRO-01');
     await forceExpire(t);
     (t.ctx.provider as DemoPaymentProvider).approve(expired.payment.externalPaymentId);
-    const bearer = `Bearer ${nonDefaultAdminToken(t)}`;
+    const bearer = `Bearer ${await nonDefaultAdminToken(t)}`;
     await t.api
       .post(`/api/admin/sessions/${expired.sessionId}/reconcile/manual`)
       .set('Authorization', bearer)

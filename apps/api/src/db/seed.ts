@@ -8,7 +8,7 @@ import {
   scryptSync,
   timingSafeEqual,
 } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import {
   DEFAULT_DURATION_SECONDS,
   DEFAULT_PRICE_EXTERNO_ARS,
@@ -200,18 +200,22 @@ export async function runSeed(db: Db, config: AppConfig): Promise<SeedResult> {
     .limit(1);
   const admin = admins[0];
   if (!admin) {
+    // La cuenta de ADMIN_EMAIL es la de soporte técnico de Insolva (ADR-062).
     await db.insert(adminUsers).values({
       id: uuid(),
       email: adminEmail,
+      name: 'Soporte técnico (Insolva)',
       passwordHash: hashSecret(adminPassword),
-      role: 'admin',
+      role: 'tecnico',
+      mustChangePassword: false,
     });
     log.info('admin user seeded', { email: adminEmail });
-  } else if (!verifySecret(adminPassword, admin.passwordHash)) {
-    // No hay pantalla de cambio de contraseña: el env es la única forma de rotarla.
+  } else if (admin.role === 'tecnico' && !verifySecret(adminPassword, admin.passwordHash)) {
+    // La cuenta técnica no cambia su clave desde la app: el env es la forma de rotarla. Solo si
+    // la fila es técnica — si la cooperativa creó una cuenta con ese mail, su clave no se pisa.
     await db
       .update(adminUsers)
-      .set({ passwordHash: hashSecret(adminPassword) })
+      .set({ passwordHash: hashSecret(adminPassword), tokenVersion: sql`${adminUsers.tokenVersion} + 1` })
       .where(eq(adminUsers.id, admin.id));
     log.info('admin password synced from env', { email: adminEmail });
   }
@@ -223,16 +227,14 @@ export async function runSeed(db: Db, config: AppConfig): Promise<SeedResult> {
     for (const row of demoPasswordAdmins) {
       await db
         .update(adminUsers)
-        .set({ passwordHash: hashSecret(randomBytes(32).toString('hex')) })
+        .set({
+          passwordHash: hashSecret(randomBytes(32).toString('hex')),
+          tokenVersion: sql`${adminUsers.tokenVersion} + 1`,
+        })
         .where(eq(adminUsers.id, row.id));
     }
     if (demoPasswordAdmins.length > 0) {
       log.warn('cuentas admin con la clave demo bloqueadas', { count: demoPasswordAdmins.length });
-    }
-    // Una cuenta con email viejo sigue entrando y ya no cuenta como "la cuenta por defecto".
-    const others = allAdmins.filter((row) => row.email !== adminEmail);
-    if (others.length > 0) {
-      log.warn('hay cuentas admin distintas de ADMIN_EMAIL', { count: others.length });
     }
   }
 

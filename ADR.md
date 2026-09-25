@@ -1260,15 +1260,30 @@
   sin cargo). Verificado: render de 5 pantallas y E2E completo en navegador en claro y oscuro.
 
 - **2026-09-25 (ADR-059). Dirección elegida para ADR-056: VPS en Hostinger + Coolify (API) + base
-  en Supabase Cloud.** Dicho por el desarrollador durante la puerta (b) de esta fase, TODAVÍA sin
-  confirmar con Pablo ni pasado por `/office-hours` + `/autoplan` — no está construido, es la
-  dirección elegida entre las dos opciones que ya dejó abiertas el ADR-056 (VPS propio con el
-  mismo Coolify/Dockerfile; base movida a Supabase Cloud vía `DATABASE_URL`, sin tocar código).
-  **Reabre la decisión cerrada del Universo** ("Producción: servidor propio, junto a Hermes",
-  `CLAUDE.md` de `Madre/`) — Hostinger es un proveedor distinto del server donde vive Hermes hoy.
-  Antes de mover algo: confirmar con Pablo y avisar al Universo (no es una decisión que el Mundo
-  cierre solo). No cambia nada de esta fase (identidad visual + PWA): sigue en DEMO, sin plata
-  real, en este server.
+  en Supabase Cloud.** Pablo lo repitió durante la puerta (b) de esta fase. **Corrección del
+  mismo día:** esta entrada decía "sin confirmar con Pablo", y es falso por dos lados: Pablo es
+  quien lo decidió, y ya estaba confirmado en la actualización del ADR-056 (2026-09-23, con
+  captura del panel de Hostinger). Lo que sigue pendiente es otra cosa: **no está construido**,
+  falta su `/office-hours` + `/autoplan`, y **reabre la decisión cerrada del Universo**
+  ("Producción: servidor propio, junto a Hermes", `CLAUDE.md` de `Madre/`), así que hay que
+  avisarle al Universo antes de mover algo real. No cambia nada de la fase de identidad visual:
+  sigue en DEMO, sin plata real, en este server.
+
+- **2026-09-25 (ADR-061). Diseño de roles y usuarios del panel aprobado
+  (`docs/designs/roles-usuarios.md`, `/office-hours`).** Pedido de Javier: crear él mismo las
+  cuentas, con admin (todo) y operador (lo básico). Decisiones de Pablo en la sesión: lo nuevo son
+  **cuentas del panel** (la carga de patentes ya existía); el **operador ve patentes pero no las
+  edita** (una patente mal cargada como remis rompe el anti-abuso de tarifas); la clave del ESP32 y
+  los ajustes técnicos quedan en un **tercer rol `tecnico`, solo Insolva e invisible para la
+  cooperativa**. Enfoque elegido: **mapa de permisos compartido en `@hidro/shared`** que usan la
+  API (403) y el panel (botones), en vez de niveles por ruta (el panel se desfasaría) o sesiones en
+  base (rehace un login que anda). Desactivar a alguien lo echa en el acto (`token_version`
+  chequeado en cada pedido) — **revierte el "aceptado a esta escala" del ADR-054** sobre las 12 h
+  del JWT, porque ahora las cuentas las maneja el cliente. La regla "la cuenta por defecto no
+  destraba pagos" pasa de chequear el email a chequear el rol. Cierra el 🔴 BLOQUEANTE de C1 de
+  `TODOS.md` cuando se construya. Revisión adversarial: 2 rondas, 17 hallazgos corregidos
+  (seed que pisaba la clave técnica, tokens viejos, arranque sin admins, fuga del mail técnico en
+  `/settings` y `/logs`).
 
 - **2026-09-25 (ADR-060). Dockerfile: reinstalar solo producción en vez de `npm prune`.** Tres
   deploys seguidos de `b31edd2` murieron en Coolify en el paso `npm prune --omit=dev`, cortados en
@@ -1279,3 +1294,38 @@
   `rm -rf node_modules && npm ci --omit=dev`, el mismo tipo de comando que ya pasaba allá.
   Verificado en local: build OK, contenedor arranca, `/health` OK, página y manifest nuevos.
   No verificado todavía en el server; si vuelve a fallar, mirar `free -h` / `df -h` ahí.
+  **Actualización del mismo día:** Pablo hizo Redeploy y pasó; verificado contra producción
+  (título nuevo, manifest, `theme-init.js`, CSP intacta y C3: `http://…/admin` → 302 a https).
+
+- **2026-09-25 (ADR-062). `/autoplan` sobre roles y usuarios aprobado. Cambia una parte del
+  ADR-061: la cuenta técnica pasa de invisible a VISIBLE e intocable.** Las voces CEO e ingeniería
+  (subagentes Claude; Codex sigue rechazando el modelo con la cuenta) marcaron por separado que una
+  cuenta oculta con acceso a tarifas y patentes, en el sistema de cobro del cliente, se ve como una
+  puerta trasera, y que enmascararla en los registros contradecía el ADR-054. Pablo eligió: aparece
+  en Usuarios como "Soporte técnico (Insolva)", sin acciones para el admin, con su mail real en los
+  registros; Pablo le avisa a Javier que existe. Otras decisiones del gate: enfoque B se mantiene,
+  una sola fase, se construye sin esperar la confirmación de la matriz, botón "Enviar por WhatsApp"
+  para la clave inicial (con cambio obligatorio en el primer ingreso), rollback por procedimiento
+  escrito. La revisión de ingeniería encontró 4 bugs de integración que habrían roto el build
+  (`requireAdmin` async en Express 4, default de `must_change_password` que bloqueaba la cuenta
+  técnica, 401 de "clave actual" que echaba al usuario, `SettingsPage` que manda los 5 campos) y
+  los 4 tests existentes que cambian de expectativa. Plan: `docs/designs/roles-usuarios.md` (T1-T13).
+
+- **2026-09-25 (ADR-063). Build de roles y usuarios (T1–T13 de `roles-usuarios.md`).** Javier
+  confirmó la matriz a través de Pablo: administrador = todo lo del negocio, operador = lo básico
+  (mirar, destrabar pagos, parada de emergencia); arrancan con **2 cuentas** (1 admin, 1 operador).
+  "Permiso total" para el admin se leyó como total **del negocio**: la clave del ESP32 y los ajustes
+  técnicos siguen en la cuenta de soporte (ADR-062), sin reabrirlo. Con un solo admin, la
+  recuperación de su clave la hace la cuenta técnica (puede resetear admins): queda escrito en la
+  guía de QA en vez de exigir 2 admins. Desvíos menores del plan, con motivo:
+  (1) `reconcilePayment*` sigue recibiendo el email del actor y no el principal: la barrera es el
+  permiso en la ruta y el actor de auditoría es el email, así que pasar el principal no agregaba
+  nada; (2) la regla "nunca cero admins" usa `SELECT … FOR UPDATE` sobre los admins activos dentro
+  de una transacción en vez de un `UPDATE` condicional con subconsulta — en Postgres READ COMMITTED
+  la subconsulta de dos pedidos simultáneos podía ver ambos el conteo viejo; el lock los serializa
+  (test con `Promise.all`); (3) un admin editando su propia clave desde Usuarios → 400 (va por
+  "Mi cuenta", que exige la actual); (4) acciones de un usuario en un modal "Gestionar" en vez de
+  un menú desplegable por fila (objetivo táctil de 44 px en celular). Tests: 86 nuevos en
+  `apps/api/tests/roles.test.ts` (matriz 23 rutas × 3 roles por login real, usuarios, clave,
+  migración re-ejecutada sobre una fila `admin` previa) + 19 en `apps/web/tests/roles.test.tsx`;
+  reescritos `mesa-de-entrada`, `reconciliation` y `seed`.

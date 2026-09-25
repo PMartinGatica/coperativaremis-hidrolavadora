@@ -136,7 +136,42 @@ export async function waitSessionStatus(t: TestCtx, sessionId: string, status: s
   });
 }
 
+/** Token de la cuenta del seed (ADMIN_EMAIL), que desde el ADR-062 es la cuenta `tecnico`. */
 export async function adminToken(t: TestCtx, email = 'admin@test.local', password = 'admin-pass'): Promise<string> {
   const res = await t.api.post('/api/admin/auth/login').send({ email, password }).expect(200);
   return res.body.token as string;
+}
+
+export interface PanelUser {
+  id: string;
+  email: string;
+  password: string;
+  token: string;
+}
+
+/**
+ * Da de alta una cuenta POR LA PUERTA REAL (ADR-062): quien la crea (por defecto la técnica)
+ * usa `POST /admin/users`, la cuenta nueva entra por el login y cambia la clave inicial
+ * (`must_change_password`). Devuelve el token ya libre para usar el panel.
+ */
+export async function createPanelUser(
+  t: TestCtx,
+  opts: { email: string; role: 'admin' | 'operador'; name?: string; creatorToken?: string },
+): Promise<PanelUser> {
+  const creator = opts.creatorToken ?? (await adminToken(t));
+  const initial = 'clave-inicial-123';
+  const password = 'clave-propia-456';
+  const created = await t.api
+    .post('/api/admin/users')
+    .set('Authorization', `Bearer ${creator}`)
+    .send({ email: opts.email, name: opts.name ?? opts.email.split('@')[0], role: opts.role, password: initial })
+    .expect(201);
+  const email = created.body.user.email as string;
+  const first = await t.api.post('/api/admin/auth/login').send({ email, password: initial }).expect(200);
+  const changed = await t.api
+    .patch('/api/admin/me/password')
+    .set('Authorization', `Bearer ${first.body.token}`)
+    .send({ currentPassword: initial, newPassword: password })
+    .expect(200);
+  return { id: created.body.user.id as string, email, password, token: changed.body.token as string };
 }

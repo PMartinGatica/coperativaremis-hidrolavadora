@@ -4,6 +4,7 @@ import {
   AppError,
   ACTIVE_SESSION_STATUSES,
   ERROR_SESSION_STATUSES,
+  permissionsOf,
   startOfDayAmericaArgentina,
   type SessionStatus,
 } from '@hidro/shared';
@@ -11,7 +12,7 @@ import type { Db } from '../db/client.js';
 import { DEMO_ADMIN_PASSWORD, type AppConfig } from '../config.js';
 import type { Logger } from '../logger.js';
 import type { PaymentProvider } from '../payments/provider.js';
-import { adminUsers, payments, sessions as sessionsTable } from '../db/schema.js';
+import { adminUsers, payments, sessions as sessionsTable, type AdminUserRow } from '../db/schema.js';
 import {
   deleteVehicle,
   getDeviceByMachine,
@@ -44,29 +45,56 @@ export interface AdminDeps {
   provider: PaymentProvider;
 }
 
-export interface AdminUser {
-  id: string;
-  email: string;
-  role: string;
+/** JWT del panel: `sub` = id de la cuenta, `tv` = su token_version. El rol NO viaja: sale de
+ *  la base en cada pedido (ADR-062). */
+export function issueToken(config: AppConfig, user: { id: string; tokenVersion: number }): string {
+  return jwt.sign({ tv: user.tokenVersion }, config.jwtSecret, {
+    subject: user.id,
+    expiresIn: '12h',
+    algorithm: 'HS256',
+  });
 }
 
-export function issueToken(config: AppConfig, user: { email: string; role: string }): string {
-  return jwt.sign({ sub: user.email, role: user.role }, config.jwtSecret, { expiresIn: '12h' });
-}
+export type TokenClaims =
+  | { ok: true; userId: string; tokenVersion: number }
+  | { ok: false; reason: 'expired' | 'session_changed' | 'invalid' };
 
-export function verifyToken(config: AppConfig, token: string): AdminUser | null {
+export function verifyToken(config: AppConfig, token: string): TokenClaims {
   try {
-    const payload = jwt.verify(token, config.jwtSecret);
-    if (typeof payload === 'object' && typeof payload.sub === 'string') {
-      return { id: payload.sub, email: payload.sub, role: String(payload.role ?? 'admin') };
-    }
-    return null;
-  } catch {
-    return null;
+    const payload = jwt.verify(token, config.jwtSecret, { algorithms: ['HS256'] });
+    if (typeof payload !== 'object' || typeof payload.sub !== 'string') return { ok: false, reason: 'invalid' };
+    // Tokens emitidos antes de la fase de roles: sub = email y sin `tv` → todos re-loguean una vez.
+    if (typeof payload.tv !== 'number' || !Number.isInteger(payload.tv)) return { ok: false, reason: 'session_changed' };
+    return { ok: true, userId: payload.sub, tokenVersion: payload.tv };
+  } catch (err) {
+    if (err instanceof jwt.TokenExpiredError) return { ok: false, reason: 'expired' };
+    return { ok: false, reason: 'invalid' };
   }
 }
 
-export async function login(deps: AdminDeps, email: string, password: string) {
+/** Hash de una clave que no es de nadie: si el email no existe, el login igual corre un scrypt
+ *  para que el tiempo de respuesta no delate qué emails tienen cuenta. */
+const DUMMY_PASSWORD_HASH = hashSecret(`dummy-${Date.now()}-${Math.random()}`);
+
+export function sessionPayload(config: AppConfig, user: AdminUserRow) {
+  return {
+    token: issueToken(config, user),
+    ...publicProfile(user),
+  };
+}
+
+export function publicProfile(user: Pick<AdminUserRow, 'email' | 'name' | 'role' | 'mustChangePassword'>) {
+  return {
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    mustChangePassword: user.mustChangePassword,
+    permissions: permissionsOf(user.role),
+  };
+}
+
+export async function login(deps: AdminDeps, rawEmail: string, password: string) {
+  const email = rawEmail.toLowerCase().trim();
   // Cubre cualquier fila guardada con la clave demo, aunque ADMIN_PASSWORD ya sea otra.
   if (deps.config.nodeEnv === 'production' && password === DEMO_ADMIN_PASSWORD) {
     await insertAudit(deps.db, {
@@ -77,14 +105,22 @@ export async function login(deps: AdminDeps, email: string, password: string) {
     });
     throw new AppError('UNAUTHORIZED', 'Credenciales inválidas.');
   }
-  const rows = await deps.db.select().from(adminUsers).where(eq(adminUsers.email, email.toLowerCase().trim())).limit(1);
+  const rows = await deps.db.select().from(adminUsers).where(eq(adminUsers.email, email)).limit(1);
   const user = rows[0];
-  if (!user || !verifySecret(password, user.passwordHash)) {
-    await insertAudit(deps.db, { actor: email, action: 'ADMIN_LOGIN_FAILED', entity: 'admin', metadata: null });
+  // Primero la clave, después `active`: una cuenta desactivada responde igual que una clave
+  // incorrecta (no confirma que el email exista).
+  const passwordOk = verifySecret(password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
+  if (!user || !passwordOk || !user.active) {
+    await insertAudit(deps.db, {
+      actor: email,
+      action: 'ADMIN_LOGIN_FAILED',
+      entity: 'admin',
+      metadata: user && passwordOk ? { reason: 'inactive' } : null,
+    });
     throw new AppError('UNAUTHORIZED', 'Credenciales inválidas.');
   }
   await insertAudit(deps.db, { actor: email, action: 'ADMIN_LOGIN', entity: 'admin', entityId: user.id, metadata: null });
-  return { token: issueToken(deps.config, { email: user.email, role: user.role }), email: user.email, role: user.role };
+  return sessionPayload(deps.config, user);
 }
 
 // El "día" del negocio es el de Ushuaia (UTC-3 fijo, sin DST), no el del servidor.
@@ -522,7 +558,6 @@ const RECONCILE_MESSAGES: Record<ReconcileResultType, string> = {
   ambiguous: 'Se encontraron varios pagos aprobados para esta sesión: posible cobro duplicado, requiere revisión manual antes de reconciliar.',
   not_recoverable: 'Esta sesión no está en un estado que se pueda reconciliar.',
   session_id_mismatch: 'Ese ID de pago no corresponde a esta sesión (revisá que sea el correcto).',
-  default_admin_forbidden: 'La cuenta de administrador por defecto no puede reconciliar pagos. Usá tu cuenta individual.',
 };
 
 export async function reconcilePaymentAuto(deps: AdminDeps, sessionId: string, actorEmail: string) {

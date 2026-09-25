@@ -1,19 +1,23 @@
 import { useCallback } from 'react';
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Car, Cpu, CreditCard, FileText, LayoutDashboard, ListChecks, LogOut, Settings, WashingMachine } from 'lucide-react';
+import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Car, Cpu, CreditCard, FileText, LayoutDashboard, ListChecks, LogOut, Settings, UserRound, Users, WashingMachine } from 'lucide-react';
+import { ROLE_LABELS, type Permission } from '@hidro/shared';
 import { api, clearToken } from '../api/client.js';
+import { useSession } from './session.js';
 import { usePolling } from '../lib/usePolling.js';
 import { BRAND } from '../brand.js';
 import { BrandLogo, ThemeToggle } from '../components/ui.js';
 
-const NAV = [
-  { to: '/admin', end: true, label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/admin/machines', label: 'Máquinas', icon: WashingMachine },
-  { to: '/admin/vehicles', label: 'Patentes', icon: Car },
-  { to: '/admin/sessions', label: 'Sesiones', icon: ListChecks },
-  { to: '/admin/payments', label: 'Pagos', icon: CreditCard },
-  { to: '/admin/logs', label: 'Registros', icon: FileText },
-  { to: '/admin/settings', label: 'Ajustes', icon: Settings },
+const NAV: Array<{ to: string; end?: boolean; label: string; icon: typeof Car; permission: Permission }> = [
+  { to: '/admin', end: true, label: 'Dashboard', icon: LayoutDashboard, permission: 'panel.ver' },
+  { to: '/admin/machines', label: 'Máquinas', icon: WashingMachine, permission: 'panel.ver' },
+  { to: '/admin/vehicles', label: 'Patentes', icon: Car, permission: 'panel.ver' },
+  { to: '/admin/sessions', label: 'Sesiones', icon: ListChecks, permission: 'panel.ver' },
+  { to: '/admin/payments', label: 'Pagos', icon: CreditCard, permission: 'panel.ver' },
+  { to: '/admin/logs', label: 'Registros', icon: FileText, permission: 'panel.ver' },
+  { to: '/admin/settings', label: 'Ajustes', icon: Settings, permission: 'panel.ver' },
+  // Al final y solo para quien gestiona cuentas (ADR-062).
+  { to: '/admin/users', label: 'Usuarios', icon: Users, permission: 'usuarios.gestionar' },
 ];
 
 const navItem = ({ isActive }: { isActive: boolean }) =>
@@ -26,6 +30,9 @@ const navChip = ({ isActive }: { isActive: boolean }) =>
 
 export default function AdminLayout() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { me, can } = useSession();
+  const mustChange = me?.mustChangePassword ?? false;
 
   const loadHealth = useCallback(async () => {
     try {
@@ -34,12 +41,43 @@ export default function AdminLayout() {
       return null;
     }
   }, []);
-  const overview = usePolling(loadHealth, 8000);
+  // Con la clave inicial pendiente el servidor responde 403 a todo menos "Mi cuenta": no consultar.
+  const overview = usePolling(loadHealth, 8000, me !== null && !mustChange);
+  const nav = me && !mustChange ? NAV.filter((item) => can(item.permission)) : [];
 
   function logout() {
     clearToken();
     navigate('/admin/login');
   }
+
+  if (mustChange && location.pathname !== '/admin/account') {
+    return <Navigate to="/admin/account" replace />;
+  }
+
+  const userChip = me ? (
+    <Link
+      to="/admin/account"
+      className="flex min-h-10 max-w-[9rem] items-center sm:max-w-[16rem] gap-2 rounded-full border border-line px-3 text-sm hover:bg-surface-2"
+      data-testid="user-chip"
+      title="Mi cuenta"
+    >
+      <UserRound size={15} aria-hidden="true" className="flex-none text-muted" />
+      <span className="min-w-0 truncate">
+        <span className="font-semibold">{me.name ?? me.email}</span>
+        <span className="hidden text-muted sm:inline"> · {ROLE_LABELS[me.role]}</span>
+      </span>
+    </Link>
+  ) : (
+    <span className="h-10 w-24 animate-pulse sm:w-40 rounded-full bg-surface-2" aria-hidden="true" />
+  );
+
+  const navSkeleton = (
+    <div className="flex flex-col gap-2" aria-hidden="true" data-testid="nav-skeleton">
+      {[0, 1, 2, 3, 4].map((i) => (
+        <span key={i} className="h-9 animate-pulse rounded-xl bg-surface-2" />
+      ))}
+    </div>
+  );
 
   const modeChip = overview ? (
     overview.demoMode ? (
@@ -61,7 +99,8 @@ export default function AdminLayout() {
           </span>
         </Link>
         <nav aria-label="Secciones del panel" className="flex flex-col gap-0.5">
-          {NAV.map((item) => (
+          {me === null ? navSkeleton : null}
+          {nav.map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end} className={navItem}>
               <item.icon size={18} aria-hidden="true" />
               {item.label}
@@ -88,13 +127,14 @@ export default function AdminLayout() {
               <BrandLogo size={36} />
               <span className="font-display text-sm font-semibold">{BRAND.appName}</span>
             </Link>
-            <div className="ml-auto flex items-center gap-2 lg:ml-0">
+            <div className="ml-auto flex min-w-0 items-center gap-2 lg:ml-0">
+              {userChip}
               {modeChip}
               <ThemeToggle />
             </div>
           </div>
           <nav aria-label="Secciones del panel" className="flex gap-1 overflow-x-auto px-3 pb-2 [scrollbar-width:none] lg:hidden">
-            {NAV.map((item) => (
+            {nav.map((item) => (
               <NavLink key={item.to} to={item.to} end={item.end} className={navChip}>
                 {item.label}
               </NavLink>

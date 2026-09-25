@@ -6,6 +6,11 @@
 
 ## Abiertos
 
+- **[Anti-abuso, P2]** Reporte diario por patente remis para el admin (cuántos lavados hizo cada
+  una), para detectar préstamo de patentes entre choferes: el vector de abuso de tarifa más
+  probable, que los roles no cubren (el cupo de 2 por día lo limita pero no lo evita). Origen:
+  `/autoplan` sobre `roles-usuarios.md` (voz CEO), 2026-09-25.
+
 - **[Pagos/seguridad, confirmar con Pablo]** Una patente de socio/remis registrada **sin PIN
   cargado** cobra la tarifa baja a cualquiera que sepa esa patente — `pinOk()`
   (`machineService.ts:110`) no exige PIN cuando el vehículo no tiene uno. Preguntar: ¿todas
@@ -82,7 +87,9 @@
   modifica por lo demás. Origen: Codex (voz eng de `/autoplan`), confirmado leyendo
   `sessionService.ts:56-115`, 2026-09-05.
 
-- 🔴 **[BLOQUEANTE de C1 desde 2026-09-23 — antes era backlog]** Permiso `reconcile` dedicado,
+- ✅ **[CONSTRUIDO 2026-09-25, ADR-063 — falta review/QA/ship]** ~~BLOQUEANTE de C1~~: permisos por
+  acción (`packages/shared/src/permissions.ts`), `pagos.destrabar` reemplaza al chequeo por email.
+  Texto original: Permiso `reconcile` dedicado,
   separado del rol `admin` genérico, en vez de negar por email por defecto (que es configuración
   frágil, no identidad real). El chequeo de email por defecto que entra en la Fase 1 cierra el
   hueco concreto encontrado; esto sería la versión robusta. Origen: Codex (voz eng), 2026-09-05.
@@ -132,7 +139,8 @@
   `/autoplan` (voz eng, subagente) sobre `docs/designs/guardas-produccion-seed.md`,
   2026-09-15.
 
-- **[Backlog, seguridad]** Pantalla para cambiar la contraseña y dar de baja cuentas admin.
+- ✅ **[CONSTRUIDO 2026-09-25, ADR-063]** Páginas Usuarios y Mi cuenta. Texto original:
+  Pantalla para cambiar la contraseña y dar de baja cuentas admin.
   Hoy la única forma de rotar la clave es `ADMIN_PASSWORD` + Redeploy (sync del seed), y una
   cuenta con email viejo (si cambia `ADMIN_EMAIL`) queda viva con permiso de reconciliar sin
   forma de borrarla desde la UI; solo hay un warning con el conteo al arrancar. Va junto con
@@ -145,7 +153,8 @@
   volumen arriesgan corromper la base. Origen: `/autoplan` (voz eng) sobre
   `docs/designs/guardas-produccion-seed.md`, 2026-09-15.
 
-- **[Backlog, seguridad — confirmado con test el 2026-09-23]** Revocar sesiones admin al rotar la
+- ✅ **[CONSTRUIDO 2026-09-25, ADR-063]** `token_version` chequeado en cada pedido; el test de
+  `mesa-de-entrada` ahora exige 401 inmediato. Texto original: Revocar sesiones admin al rotar la
   clave: `verifyToken` (`adminService.ts:57`) solo valida firma y vencimiento, así que un JWT
   emitido antes de cambiar `ADMIN_PASSWORD` (o de borrar la cuenta) sigue sirviendo hasta 12 h.
   Fix: versión de token o `passwordChangedAt` en `admin_users`, chequeado en cada request.

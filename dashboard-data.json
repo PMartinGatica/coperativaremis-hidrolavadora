@@ -1,7 +1,7 @@
 {
   "_meta": {
     "descripcion": "Datos del Mundo HIDRO SELF-SERVICE para el dashboard. Vive ACA, dentro del Mundo, no en Madre: cada Mundo tiene su estado, su ADR y sus archivos de periodo propios (regla de Pablo, 2026-09-05).",
-    "actualizado": "2026-09-24",
+    "actualizado": "2026-09-25",
     "estados_posibles": [
       "idea",
       "en-proceso",
@@ -67,7 +67,7 @@
         "estado": "pendiente"
       }
     ],
-    "proximo_paso": "[CLAUDE] /review + /cso sobre el diff de identidad visual. [HUMANO] Correr qa/FASE-identidad-visual-manual.md y mandar el logo en alta resolucion. Despues /ship + /retro + storyline. Siguen: C2b con Javi, C1, verificar C3 en prod.",
+    "proximo_paso": "[CLAUDE] /review + /cso sobre el diff de roles y usuarios (Build T1-T13 hecho, ADR-063, sin commit). [HUMANO] Correr qa/FASE-roles-manual.md; avisarle a Javier de la cuenta de soporte de Insolva. Despues /ship + arranque en produccion (tecnico crea a Javier, Javier crea al operador) + /retro + storyline.",
     "bloqueos": [
       "[ANTES DE DESPLEGAR] ADR-025/026: NODE_ENV=production no es opcional -- sin el, TEST_SPEED_FACTOR=10 hace que el lavado de 180 s dure 18 s y queda un ESP32 simulado corriendo en el server publico. La guia de deploy lo omitia (error propio, corregido). Ademas, sin guarda: admin por defecto admin@hidro.local con clave conocida y patentes demo remis $500 se siembran tambien en produccion. Mitigado con SEED_DEMO=false + clave propia; el arreglo real es Fase 1.",
       "[PIERDE PLATA] ADR-023: a los 120 s el barrido marca PAYMENT_EXPIRED sin preguntarle a Mercado Pago, y ese estado es TERMINAL (verificado ejecutando: TRANSITIONS vacio), asi que un webhook tardio ya no recupera nada. Los 120 s corren desde que el cliente carga la patente, no desde que abre el checkout: se dispara en un pago lento normal. Alcance de la Fase 1, borrador en fases/FASE-1.md.",

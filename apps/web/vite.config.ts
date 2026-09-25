@@ -36,9 +36,10 @@ export default defineConfig({
   server: {
     port: 5173,
     host: '127.0.0.1',
+    // HIDRO_API_URL: para levantar una segunda copia (p. ej. el E2E) sin chocar con una API ya abierta.
     proxy: {
-      '/api': { target: 'http://127.0.0.1:3020', changeOrigin: true },
-      '/health': { target: 'http://127.0.0.1:3020', changeOrigin: true },
+      '/api': { target: process.env.HIDRO_API_URL ?? 'http://127.0.0.1:3020', changeOrigin: true },
+      '/health': { target: process.env.HIDRO_API_URL ?? 'http://127.0.0.1:3020', changeOrigin: true },
     },
   },
   build: {

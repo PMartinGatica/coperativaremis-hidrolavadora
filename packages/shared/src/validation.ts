@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { DEVICE_EVENT_TYPES } from './types.js';
+import { ASSIGNABLE_ROLES, MIN_PASSWORD_LENGTH } from './permissions.js';
 
 /** Validación de entradas del protocolo de dispositivo (POST /api/device/*). */
 export const HeartbeatPayloadSchema = z.object({
@@ -142,6 +143,47 @@ export const PaymentReconcileManualSchema = z.object({
   /** ID real de pago de Mercado Pago (el que ve mesa de entrada en su propio dashboard). */
   paymentId: z.string().min(1, 'Ingresá el ID de pago de Mercado Pago.').max(64),
 });
+
+// ---------- Usuarios del panel (ADR-062) ----------
+// `.strict()`: `tokenVersion`, `mustChangePassword` o `role: 'tecnico'` nunca vienen del cliente.
+const EmailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .pipe(z.string().email('Email inválido.').max(128));
+
+const PasswordSchema = z
+  .string()
+  .min(MIN_PASSWORD_LENGTH, `La clave tiene que tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`)
+  .max(256);
+
+const UserNameSchema = z.string().trim().min(1, 'Ingresá el nombre.').max(80);
+
+export const UserCreateSchema = z
+  .object({
+    email: EmailSchema,
+    name: UserNameSchema,
+    role: z.enum(ASSIGNABLE_ROLES),
+    password: PasswordSchema,
+  })
+  .strict();
+
+export const UserPatchSchema = z
+  .object({
+    name: UserNameSchema.optional(),
+    role: z.enum(ASSIGNABLE_ROLES).optional(),
+    active: z.boolean().optional(),
+    password: PasswordSchema.optional(),
+  })
+  .strict()
+  .refine((v) => Object.keys(v).length > 0, { message: 'No hay nada para cambiar.' });
+
+export const PasswordChangeSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Ingresá tu clave actual.').max(256),
+    newPassword: PasswordSchema,
+  })
+  .strict();
 
 export const SettingsPatchSchema = z.object({
   demoSpeedFactor: z.number().min(1).max(600).optional(),

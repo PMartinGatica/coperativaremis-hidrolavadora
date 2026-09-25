@@ -195,6 +195,19 @@ export function createAdminLoginRateLimit() {
   });
 }
 
+/** "Mi cuenta → cambiar clave": misma medida que el login pero contador aparte y POR CUENTA,
+ *  no por IP (la cooperativa comparte una IP). Corre después de requireAdmin. */
+export function createPasswordChangeRateLimit() {
+  return rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 10,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    keyGenerator: (req) => `user:${req.admin?.id ?? clientIp(req)}`,
+    message: { error: { code: 'RATE_LIMITED', message: 'Demasiados intentos. Probá de nuevo en 15 minutos.' } },
+  });
+}
+
 export function createSimulateRateLimit() {
   return rateLimit({
     windowMs: 60 * 1000,

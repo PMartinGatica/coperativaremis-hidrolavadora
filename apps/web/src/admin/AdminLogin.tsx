@@ -1,7 +1,15 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, LogIn } from 'lucide-react';
-import { api, ApiError, storeToken } from '../api/client.js';
+import { api, ApiError, storeToken, takeLogoutReason } from '../api/client.js';
+
+/** Por qué la sacaron del panel (motivo del 401, ADR-062). Sin esto la baja parece un error. */
+const LOGOUT_NOTICES: Record<string, string> = {
+  inactive: 'Tu cuenta fue desactivada por un administrador.',
+  session_changed: 'Tu cuenta fue modificada por un administrador. Volvé a entrar.',
+  expired: 'Tu sesión venció. Volvé a entrar.',
+  invalid: 'Tu sesión venció. Volvé a entrar.',
+};
 import { BRAND } from '../brand.js';
 import { BrandLogo, ThemeToggle } from '../components/ui.js';
 
@@ -11,15 +19,22 @@ export default function AdminLogin() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [notice] = useState(() => {
+    const reason = takeLogoutReason();
+    return reason ? (LOGOUT_NOTICES[reason] ?? LOGOUT_NOTICES.expired) : null;
+  });
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const r = await api<{ token: string }>('/admin/auth/login', { method: 'POST', body: { email, password } });
+      const r = await api<{ token: string; mustChangePassword: boolean }>('/admin/auth/login', {
+        method: 'POST',
+        body: { email, password },
+      });
       storeToken(r.token);
-      navigate('/admin', { replace: true });
+      navigate(r.mustChangePassword ? '/admin/account' : '/admin', { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error al iniciar sesión.');
     } finally {
@@ -51,6 +66,9 @@ export default function AdminLogin() {
             <label htmlFor="login-password" className="mb-1 block text-sm font-semibold">Contraseña</label>
             <input id="login-password" className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
           </div>
+          {notice && !error ? (
+            <div role="status" className="rounded-xl bg-warn-soft p-3 text-sm text-warn" data-testid="logout-notice">{notice}</div>
+          ) : null}
           {error ? <div role="alert" className="rounded-xl bg-err-soft p-3 text-sm text-err">{error}</div> : null}
           <button className="btn btn-primary min-h-12 w-full text-base" disabled={busy}>
             {busy ? <span className="spinner" aria-hidden="true" /> : <LogIn size={17} aria-hidden="true" />}

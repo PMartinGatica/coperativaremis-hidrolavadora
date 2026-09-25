@@ -6,6 +6,7 @@ import { usePolling } from '../../lib/usePolling.js';
 import { formatArs, formatMinutes, timeAgo } from '../../lib/format.js';
 import { MachineBadge, Modal, StatusBadge } from '../../components/ui.js';
 import type { MachineStatus, SessionStatus } from '@hidro/shared';
+import { useSession } from '../session.js';
 
 interface AdminMachine {
   id: string;
@@ -33,6 +34,7 @@ interface AdminMachine {
 }
 
 export default function MachinesPage() {
+  const { can } = useSession();
   const [editId, setEditId] = useState<string | null>(null);
   const [qrId, setQrId] = useState<string | null>(null);
   const [stopId, setStopId] = useState<string | null>(null);
@@ -84,18 +86,24 @@ export default function MachinesPage() {
               </div>
 
               <div className="mt-4 grid grid-cols-2 gap-2">
-                <button className="btn btn-ghost gap-1.5 py-2 text-xs" onClick={() => setEditId(m.id)}>
-                  <Pencil size={12} /> EDITAR
-                </button>
+                {can('maquina.configurar') ? (
+                  <button className="btn btn-ghost gap-1.5 py-2 text-xs" onClick={() => setEditId(m.id)}>
+                    <Pencil size={12} /> EDITAR
+                  </button>
+                ) : null}
                 <button className="btn btn-ghost gap-1.5 py-2 text-xs" onClick={() => setQrId(m.id)}>
                   <QrCode size={12} /> GENERAR QR
                 </button>
-                <button className="btn btn-ghost gap-1.5 py-2 text-xs" onClick={() => void rotateSecret(m.id, setSecretFor)}>
-                  <KeyRound size={12} /> ROTAR SECRET
-                </button>
-                <button className="btn btn-danger gap-1.5 py-2 text-xs" onClick={() => setStopId(m.id)}>
-                  <AlertTriangle size={12} /> DETENER MÁQUINA
-                </button>
+                {can('dispositivo.rotar_clave') ? (
+                  <button className="btn btn-ghost gap-1.5 py-2 text-xs" onClick={() => void rotateSecret(m.id, setSecretFor)}>
+                    <KeyRound size={12} /> ROTAR SECRET
+                  </button>
+                ) : null}
+                {can('maquina.parada_emergencia') ? (
+                  <button className="btn btn-danger gap-1.5 py-2 text-xs" onClick={() => setStopId(m.id)}>
+                    <AlertTriangle size={12} /> DETENER MÁQUINA
+                  </button>
+                ) : null}
               </div>
             </div>
           ))}

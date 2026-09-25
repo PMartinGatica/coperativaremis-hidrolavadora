@@ -6,6 +6,7 @@ import { usePolling } from '../../lib/usePolling.js';
 import { formatArs, formatDateTime, formatTime } from '../../lib/format.js';
 import { Card, StatusBadge } from '../../components/ui.js';
 import type { ReconcileResultType, SessionTimelineEvent, SessionStatus } from '@hidro/shared';
+import { ReadOnlyNote, useSession } from '../session.js';
 
 interface ReconcileResponse {
   result: ReconcileResultType;
@@ -62,6 +63,7 @@ function timelineTone(type: string): string {
 
 export default function SessionDetailPage() {
   const { sessionId = '' } = useParams();
+  const { can } = useSession();
 
   const load = useCallback(async () => {
     try {
@@ -188,7 +190,10 @@ export default function SessionDetailPage() {
         </Card>
       </div>
 
-      {session.status === 'PAYMENT_EXPIRED' ? (
+      {session.status === 'PAYMENT_EXPIRED' && !can('pagos.destrabar') ? (
+        <ReadOnlyNote>Destrabar pagos lo hace una persona de la cooperativa con su propia cuenta, así queda su nombre en el registro.</ReadOnlyNote>
+      ) : null}
+      {session.status === 'PAYMENT_EXPIRED' && can('pagos.destrabar') ? (
         <Card className="space-y-3 p-5">
           <div className="text-[0.68rem] uppercase tracking-[0.24em] text-faint">Reconciliación</div>
           <button

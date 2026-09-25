@@ -206,7 +206,13 @@ export const adminUsers = pgTable('admin_users', {
   id: text('id').primaryKey(),
   email: text('email').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
-  role: text('role').notNull().default('admin'),
+  /** 'tecnico' | 'admin' | 'operador' (CHECK en la migración 0003; permisos en @hidro/shared). */
+  role: text('role').notNull().default('operador'),
+  name: text('name'),
+  active: boolean('active').notNull().default(true),
+  /** Se incrementa al desactivar, cambiar rol o clave: invalida todos los JWT anteriores. */
+  tokenVersion: integer('token_version').notNull().default(0),
+  mustChangePassword: boolean('must_change_password').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -225,3 +231,4 @@ export type AuthorizationRow = typeof authorizations.$inferSelect;
 export type DeviceEventRow = typeof deviceEvents.$inferSelect;
 export type AuditLogRow = typeof auditLogs.$inferSelect;
 export type DeviceCommandRow = typeof deviceCommands.$inferSelect;
+export type AdminUserRow = typeof adminUsers.$inferSelect;

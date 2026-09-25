@@ -3,8 +3,9 @@
 import { spawn } from 'node:child_process';
 
 const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
-const BASE = 'http://127.0.0.1:5173';
-const API = 'http://127.0.0.1:3020';
+// E2E_BASE / E2E_API: para correrlo contra una copia en otros puertos sin tocar la que ya esté abierta.
+const BASE = process.env.E2E_BASE ?? 'http://127.0.0.1:5173';
+const API = process.env.E2E_API ?? 'http://127.0.0.1:3020';
 const DEBUG_PORT = 9444;
 const THEME = process.env.THEME === 'dark' ? 'dark' : 'light';
 
@@ -184,6 +185,65 @@ async function main() {
     ok(overview.stats?.washesToday >= 1, `lavados de hoy: ${overview.stats?.washesToday}`);
     ok(overview.stats?.revenueToday >= 500, `ingresos de hoy: $${overview.stats?.revenueToday}`);
     ok(overview.stats?.byCategory?.remis?.washes >= 1, `desglose remis: ${overview.stats?.byCategory?.remis?.washes} lavados`);
+
+    // ---- [9] roles (ADR-062): la cuenta del seed es la técnica y da de alta a las demás ----
+    console.log('[9] roles: operador y admin por el panel');
+    const stamp = Date.now();
+    const createAccount = async (role) => {
+      const email = `e2e-${role}-${stamp}@coop.local`;
+      const res = await fetch(`${API}/api/admin/users`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${login.token}` },
+        body: JSON.stringify({ email, name: `E2E ${role}`, role, password: 'clave-inicial-e2e' }),
+      });
+      ok(res.status === 201, `la cuenta técnica crea un ${role} (${res.status})`);
+      return email;
+    };
+    const setById = (id, value) =>
+      evalJs(ws, `(() => {
+        const input = document.getElementById(${JSON.stringify(id)});
+        if (!input) return 'NOT_FOUND';
+        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+        setter.call(input, ${JSON.stringify(value)});
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        return 'SET';
+      })()`);
+    const firstLogin = async (email) => {
+      await evalJs(ws, `localStorage.removeItem('hidro.admin.token'); location.href = '/admin/login'; 'ok'`);
+      await waitFor(() => exists(ws, 'admin-login'), 'pantalla de login');
+      await setById('login-email', email);
+      await setById('login-password', 'clave-inicial-e2e');
+      await clickByText(ws, 'Ingresar');
+      await waitFor(() => exists(ws, 'must-change-notice'), 'primer ingreso: pide cambiar la clave');
+      ok(true, `${email}: el primer ingreso lleva a "Mi cuenta"`);
+      await setInput(ws, 'pw-current', 'clave-inicial-e2e');
+      await setInput(ws, 'pw-next', 'clave-propia-e2e');
+      await clickTestId(ws, 'pw-submit');
+      await waitFor(async () => (await evalJs(ws, `location.pathname`)) === '/admin', 'vuelve al panel tras cambiar la clave');
+      await waitFor(() => exists(ws, 'user-chip'), 'chip con nombre y rol');
+    };
+    const navHas = (label) =>
+      evalJs(ws, `[...document.querySelectorAll('nav a')].some((a) => a.innerText.trim() === ${JSON.stringify(label)})`);
+
+    const operador = await createAccount('operador');
+    const admin = await createAccount('admin');
+
+    await firstLogin(operador);
+    ok((await bodyText(ws)).includes('Operador'), 'el chip dice Operador');
+    ok(!(await navHas('Usuarios')), 'el operador NO ve "Usuarios" en el menú');
+    await evalJs(ws, `history.pushState({}, '', '/admin/vehicles'); dispatchEvent(new PopStateEvent('popstate')); 'ok'`);
+    await waitFor(() => exists(ws, 'read-only-note'), 'patentes en solo lectura');
+    ok(!(await bodyText(ws)).includes('GUARDAR PATENTE'), 'el operador no ve el alta de patentes');
+
+    await firstLogin(admin);
+    ok(await navHas('Usuarios'), 'el admin ve "Usuarios" en el menú');
+    await evalJs(ws, `history.pushState({}, '', '/admin/users'); dispatchEvent(new PopStateEvent('popstate')); 'ok'`);
+    await waitFor(() => exists(ws, 'user-new'), 'página Usuarios');
+    // La lista llega después que el encabezado: esperar a que aparezca alguna cuenta.
+    await waitFor(async () => (await bodyText(ws)).includes(operador), 'lista de usuarios cargada', 10000).catch(() => null);
+    const usersText = await bodyText(ws);
+    ok(usersText.includes('Soporte técnico (Insolva)'), 'la cuenta técnica aparece como "Soporte técnico (Insolva)"');
+    ok(usersText.includes(operador), 'el operador aparece en la lista');
 
     console.log(failures === 0 ? `\n=== E2E EN NAVEGADOR (${THEME}): PASS ===` : `\n=== ${failures} FALLOS (${THEME}) ===`);
     ws.close();

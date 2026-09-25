@@ -148,7 +148,8 @@ anotalos como pendientes, y seguí derecho con el paso 15 (que es de nuevo en la
 | 11 | *(celular, con la versión ya publicada — no antes del deploy)* Abrir desde el QR | Se lee bien al sol; los botones se pueden tocar con el pulgar sin agrandar la pantalla | ☐ |
 | 12 | *(Android, Chrome, versión publicada)* Menú (3 puntitos arriba a la derecha) → "Instalar app" | Aparece "Hidrolavadora" con el logo; al abrirla desde el ícono va directo a la máquina | ☐ |
 | 13 | *(iPhone, Safari, versión publicada)* Botón de Compartir (el cuadrado con la flecha) → "Agregar a inicio" | Ícono con el logo; al abrirlo ocupa toda la pantalla (sin la barra de Safari arriba) | ☐ |
-| 14 | *(celular, app ya instalada)* Pagar desde el ícono instalado y volver de Mercado Pago | La app sigue sola, sin tocar nada, al paso "Pago aprobado" | ☐ |
+| 14 | *(celular, app ya instalada — producción en MODO DEMO)* Desde el ícono instalado: patente → "Pagar" → en la pantalla de pago simulado tocar "APROBAR" → "VOLVER A LA MÁQUINA". **En demo "Pagar" NO abre Mercado Pago**: abre la pantalla de simulación (APROBAR / RECHAZAR), no se cobra nada | Muestra "Pago aprobado" **sin salirse de la app instalada** | ☐ |
+| 14b | *(PENDIENTE para el día de Mercado Pago real, no ahora)* Pagar de verdad desde la app instalada y volver de Mercado Pago | La vuelta cae en la app instalada y sigue sola a "Pago aprobado". **Riesgo a mirar en iPhone:** que la vuelta abra Safari en vez de la app | ☐ |
 | 15 | En la PC, abrir `http://127.0.0.1:5173/admin` → ingresar usuario `admin@hidro.local` y contraseña `hidro-demo-2025` → tocar "Ingresar" | Menú lateral blanco con el logo, Dashboard con 6 números arriba, tarjetas de máquinas, tabla "Últimas sesiones" abajo | ☐ |
 | 16 | Con el panel abierto: tocar el botón de luna, y después achicar la ventana del navegador (o mirarlo en el celular) | Oscuro se ve legible; con la ventana angosta el menú pasa arriba y se puede deslizar de costado | ☐ |
 
@@ -199,6 +200,8 @@ Estos no van en orden, se prueban aparte, con el sistema ya prendido (Preparaci�
 3. Ya se puede cerrar también el navegador.
 
 ## Veredicto del humano
-- [ ] Todos los pasos OK → puerta (b) verde.
+- [x] Todos los pasos OK → puerta (b) verde. **Validado por el humano el 2026-09-25:** 1–10b y
+  casos borde en local; 11–14 en el celular contra producción (deploy `29c7783`). Queda
+  pendiente solo el 14b, que depende de activar Mercado Pago real.
 - [ ] Hay problemas → anotá cuáles (con número de paso) y la fase NO cierra:
   - …
