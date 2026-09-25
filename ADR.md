@@ -1269,3 +1269,13 @@
   Antes de mover algo: confirmar con Pablo y avisar al Universo (no es una decisión que el Mundo
   cierre solo). No cambia nada de esta fase (identidad visual + PWA): sigue en DEMO, sin plata
   real, en este server.
+
+- **2026-09-25 (ADR-060). Dockerfile: reinstalar solo producción en vez de `npm prune`.** Tres
+  deploys seguidos de `b31edd2` murieron en Coolify en el paso `npm prune --omit=dev`, cortados en
+  seco sin ningún error de npm (exit 255 del contenedor de build), mientras que el `npm ci`
+  completo del paso anterior pasaba (144 s). La misma imagen construye bien en la PC (el prune
+  tardó 6 s). Esta fase sumó jsdom + vitest + testing-library a las devDependencies de la web;
+  hipótesis más probable: el server se queda sin memoria al comparar árboles en el prune. Fix:
+  `rm -rf node_modules && npm ci --omit=dev`, el mismo tipo de comando que ya pasaba allá.
+  Verificado en local: build OK, contenedor arranca, `/health` OK, página y manifest nuevos.
+  No verificado todavía en el server; si vuelve a fallar, mirar `free -h` / `df -h` ahí.

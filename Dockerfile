@@ -12,9 +12,12 @@ RUN npm ci --ignore-scripts
 COPY . .
 # check:bundle rompe la imagen si el build publica credenciales o patentes demo.
 RUN npm run build && npm run check:bundle
-# Podar devDependencies (typescript, vitest, drizzle-kit, supertest…) ANTES de
-# copiar a runtime: el árbol que viaja pesa ~120 MB en vez de ~500 MB.
-RUN npm prune --omit=dev --ignore-scripts && npm cache clean --force
+# Sacar devDependencies (typescript, vitest, drizzle-kit, supertest…) ANTES de copiar a
+# runtime: el árbol que viaja pesa ~120 MB en vez de ~500 MB. Reinstalar solo prod en vez
+# de `npm prune`: en el server de Coolify el prune moría sin error (probable falta de
+# memoria al comparar árboles) mientras que `npm ci` pasaba (2026-09-25, ADR-060).
+RUN rm -rf node_modules apps/*/node_modules packages/*/node_modules \
+  && npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 FROM node:22-alpine
 ENV NODE_ENV=production
