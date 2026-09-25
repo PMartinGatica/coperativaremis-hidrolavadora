@@ -42,12 +42,31 @@ export const DeviceEventPayloadSchema = z.object({
 });
 
 // ---------- Público ----------
-/** Normaliza una patente argentina: mayúsculas, sin espacios ni guiones. */
+/** Normaliza una patente: mayúsculas, sin espacios, puntos ni guiones. */
 export function normalizePlate(raw: string): string {
   return raw.toUpperCase().replace(/[\s.-]/g, '');
 }
 
-export const PLATE_REGEX = /^[A-Z0-9]{6,8}$/;
+/** 4 a 10 alfanuméricos ya normalizados. Acepta patentes de otros países (turistas):
+ *  una patente no registrada cotiza como particular, así que ampliar el rango no abarata
+ *  nada (ADR-057). */
+export const PLATE_REGEX = /^[A-Z0-9]{4,10}$/;
+
+export const PLATE_INVALID_MESSAGE = 'Patente inválida (ej: AG945RS).';
+
+const AR_PLATE_PATTERNS = [
+  /^[A-Z]{2}\d{3}[A-Z]{2}$/, // auto Mercosur (AG945RS)
+  /^[A-Z]{3}\d{3}$/, // auto formato viejo (ABC123)
+  /^[A-Z]\d{3}[A-Z]{3}$/, // moto Mercosur (A123BCD)
+  /^\d{3}[A-Z]{3}$/, // moto formato viejo (123ABC)
+];
+
+/** Solo informativo para la pantalla: el precio lo decide el servidor por registro, no
+ *  por formato. Un formato no reconocido puede ser igual una patente argentina registrada. */
+export function plateOrigin(plate: string): 'ar' | 'foreign' {
+  const p = normalizePlate(plate);
+  return AR_PLATE_PATTERNS.some((re) => re.test(p)) ? 'ar' : 'foreign';
+}
 
 /** PIN de 4 dígitos (remis/socio). Opcional: una patente particular no manda nada acá. */
 export const PIN_REGEX = /^\d{4}$/;
@@ -58,7 +77,7 @@ export const PlateBodySchema = z.object({
     .min(1, 'Ingresá la patente.')
     .max(16)
     .transform((v) => normalizePlate(v))
-    .refine((v) => PLATE_REGEX.test(v), { message: 'Patente inválida (ej: AE123CD).' }),
+    .refine((v) => PLATE_REGEX.test(v), { message: PLATE_INVALID_MESSAGE }),
   // El input del cliente puede mandar '' (campo vacío, no tocado) — se trata igual que
   // "no mandó pin", no como un PIN inválido.
   pin: z
@@ -102,7 +121,7 @@ export const VehicleUpsertSchema = z.object({
     .min(1, 'Ingresá la patente.')
     .max(16)
     .transform((v) => normalizePlate(v))
-    .refine((v) => PLATE_REGEX.test(v), { message: 'Patente inválida (ej: AE123CD).' }),
+    .refine((v) => PLATE_REGEX.test(v), { message: PLATE_INVALID_MESSAGE }),
   category: z.enum(['remis', 'socio']),
   ownerName: z.string().max(128).optional(),
   // Tri-estado: AUSENTE (undefined) = no tocar el PIN existente; null = borrarlo

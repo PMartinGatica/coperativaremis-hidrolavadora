@@ -50,6 +50,22 @@ describe('patentes y tarifas por categoría', () => {
     await t.api.post('/api/public/machines/HIDRO-01/quote').send({ plate: 'abc' }).expect(400);
   });
 
+  it('patente de otro país (formato no argentino) -> se acepta y cotiza $8.000 (externo)', async () => {
+    t = await createTestApp();
+    const chile = await quote('BBCL42');
+    expect(chile.plate).toBe('BBCL42');
+    expect(chile.category).toBe('externo');
+    expect(chile.priceArs).toBe(8000);
+    const corta = await quote('1234');
+    expect(corta.category).toBe('externo');
+  });
+
+  it('patente de 11 caracteres -> 400 con el mensaje de ejemplo actual', async () => {
+    t = await createTestApp();
+    const res = await t.api.post('/api/public/machines/HIDRO-01/quote').send({ plate: 'ABCDEFGHIJK' }).expect(400);
+    expect(JSON.stringify(res.body)).toContain('AG945RS');
+  });
+
   it('crear sesión SIN patente -> 400 (nunca se cobra)', async () => {
     t = await createTestApp();
     await waitMachineStatus(t, 'HIDRO-01', 'ONLINE');
