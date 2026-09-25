@@ -1,3 +1,5 @@
+import { safeGet, safeRemove, safeSet } from '../lib/storage.js';
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -44,12 +46,14 @@ export async function api<T = unknown>(path: string, opts: ApiOptions = {}): Pro
 
 const TOKEN_KEY = 'hidro.admin.token';
 
+// safe*: api() lee el token en CADA request, también en la página pública del cliente. Con
+// el almacenamiento bloqueado, un localStorage directo tiraba abajo toda la página.
 export function storeToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token);
+  safeSet(TOKEN_KEY, token);
 }
 export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  return safeGet(TOKEN_KEY);
 }
 export function clearToken(): void {
-  localStorage.removeItem(TOKEN_KEY);
+  safeRemove(TOKEN_KEY);
 }
