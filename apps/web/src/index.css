@@ -1,23 +1,81 @@
 @import "tailwindcss";
 
-@theme {
-  --color-carbon: #06090d;
-  --color-panel: #0b1118;
-  --color-panel2: #101926;
-  --color-panel3: #162130;
-  --color-line: rgba(140, 172, 205, 0.14);
-  --color-line2: rgba(140, 172, 205, 0.24);
-  --color-ink: #e9f0f6;
-  --color-dim: #8ba2b6;
-  --color-faint: #5b7185;
-  --color-aqua: #2ee6c8;
-  --color-aqua-deep: #0fa98e;
-  --color-ok: #34d17e;
-  --color-warn: #f2b44c;
-  --color-err: #ff6b6b;
+/* ---------- Tokens (ADR-057) ----------
+   Claro por defecto; oscuro solo si el usuario lo eligió (public/theme-init.js pone
+   data-theme en <html> antes del primer pintado). */
+:root {
+  color-scheme: light;
+  --bg: #f7f5ee;
+  --surface: #ffffff;
+  --surface-2: #f0ede3;
+  --line: #e3dfd2;
+  --line-strong: #cfc9b8;
+  --ink: #16201a;
+  --muted: #56615a;
+  --primary: #1e7e48;
+  --primary-strong: #176a3b;
+  --on-primary: #ffffff;
+  --primary-soft: #e4f1e8;
+  --primary-soft-ink: #145c33;
+  --warn: #8a5200;
+  --warn-soft: #fbf0dc;
+  --err: #b3261e;
+  --err-soft: #fbe7e5;
+}
 
-  --font-display: "Chakra Petch", ui-sans-serif, sans-serif;
-  --font-body: "IBM Plex Sans", ui-sans-serif, sans-serif;
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0e1411;
+  --surface: #151d18;
+  --surface-2: #1c2620;
+  --line: #2a372f;
+  --line-strong: #3a4a40;
+  --ink: #e9efea;
+  --muted: #a7b3ab;
+  --primary: #43c07c;
+  --primary-strong: #2fae6a;
+  --on-primary: #06170d;
+  --primary-soft: #173524;
+  --primary-soft-ink: #8fe0b2;
+  --warn: #f0b75a;
+  --warn-soft: #3a2c12;
+  --err: #f28b82;
+  --err-soft: #3b1c1a;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-strong: var(--primary-strong);
+  --color-on-primary: var(--on-primary);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-soft-ink: var(--primary-soft-ink);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-err: var(--err);
+  --color-err-soft: var(--err-soft);
+
+  /* Alias de la estética anterior: dejan que todo el panel se repinte sin tocar cada
+     página. Se borran de a una página por vez (TODOS.md). No usarlos en código nuevo. */
+  --color-carbon: var(--bg);
+  --color-panel: var(--surface);
+  --color-panel2: var(--surface-2);
+  --color-panel3: var(--surface-2);
+  --color-line2: var(--line-strong);
+  --color-dim: var(--muted);
+  --color-faint: var(--muted);
+  --color-aqua: var(--primary);
+  --color-aqua-deep: var(--primary-strong);
+  --color-ok: var(--primary);
+
+  --font-display: "Lexend", ui-sans-serif, sans-serif;
+  --font-body: "Source Sans 3", ui-sans-serif, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
 
@@ -28,45 +86,55 @@ body,
 }
 
 body {
-  background-color: var(--color-carbon);
-  color: var(--color-ink);
+  background-color: var(--bg);
+  color: var(--ink);
   font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  /* atmósfera: retícula industrial sutil + viñeta */
-  background-image:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(46, 230, 200, 0.09), transparent 60%),
-    linear-gradient(rgba(140, 172, 205, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(140, 172, 205, 0.035) 1px, transparent 1px);
-  background-size: 100% 100%, 44px 44px, 44px 44px;
+  caret-color: var(--primary);
 }
+
+/* ---------- Superficies del navegador (también son marca) ---------- */
+::selection {
+  background: var(--primary-soft);
+  color: var(--ink);
+}
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 8px; border: 2px solid var(--bg); }
+::-webkit-scrollbar-track { background: transparent; }
 
 /* ---------- componentes base ---------- */
 .card {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0) 40%), var(--color-panel);
-  border: 1px solid var(--color-line);
-  border-radius: 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
 }
 
 .card-hover {
-  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+  transition: border-color 0.15s ease;
 }
 .card-hover:hover {
-  border-color: var(--color-line2);
-  box-shadow: 0 12px 40px -18px rgba(46, 230, 200, 0.22);
+  border-color: var(--line-strong);
 }
 
 .chip {
   display: inline-flex;
+  white-space: nowrap;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.2rem 0.6rem;
+  padding: 0.2rem 0.65rem;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.06em;
-  color: var(--color-dim);
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--line);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  background: var(--surface-2);
 }
 
 .btn {
@@ -74,117 +142,101 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  border-radius: 14px;
+  border-radius: 12px;
   font-weight: 600;
-  letter-spacing: 0.02em;
   cursor: pointer;
   user-select: none;
   border: 1px solid transparent;
-  transition: transform 0.1s ease, filter 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+  transition: transform 0.1s ease, background-color 0.15s ease, border-color 0.15s ease;
 }
 .btn:active {
-  transform: scale(0.97);
+  transform: scale(0.98);
 }
 .btn:disabled {
-  opacity: 0.45;
+  opacity: 0.5;
   cursor: not-allowed;
   transform: none;
 }
 
+/* Acción principal. `.btn-aqua` es el nombre viejo: mismo estilo. */
+.btn-primary,
 .btn-aqua {
-  background: linear-gradient(180deg, #3af0d2, #19c4a4);
-  color: #03241d;
-  box-shadow: 0 10px 30px -12px rgba(46, 230, 200, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  background: var(--primary);
+  color: var(--on-primary);
+  font-family: var(--font-display);
 }
+.btn-primary:hover:not(:disabled),
 .btn-aqua:hover:not(:disabled) {
-  filter: brightness(1.06);
+  background: var(--primary-strong);
 }
 
 .btn-ghost {
-  background: rgba(255, 255, 255, 0.03);
-  border-color: var(--color-line2);
-  color: var(--color-ink);
+  background: var(--surface);
+  border-color: var(--line-strong);
+  color: var(--ink);
 }
 .btn-ghost:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--surface-2);
 }
 
 .btn-danger {
-  background: rgba(255, 107, 107, 0.1);
-  border-color: rgba(255, 107, 107, 0.4);
-  color: #ff9a9a;
+  background: var(--err-soft);
+  border-color: var(--err);
+  color: var(--err);
 }
 .btn-danger:hover:not(:disabled) {
-  background: rgba(255, 107, 107, 0.2);
+  background: var(--surface);
 }
 
 .btn-ok {
-  background: rgba(52, 209, 126, 0.12);
-  border-color: rgba(52, 209, 126, 0.4);
-  color: #6fe3a4;
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary-soft-ink);
 }
 .btn-ok:hover:not(:disabled) {
-  background: rgba(52, 209, 126, 0.22);
+  background: var(--surface);
 }
 
 .input {
   width: 100%;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--color-line2);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
   border-radius: 12px;
   padding: 0.65rem 0.85rem;
-  color: var(--color-ink);
-  font-size: 0.95rem;
+  color: var(--ink);
+  font-size: 1rem;
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .input:focus {
-  border-color: var(--color-aqua);
-  box-shadow: 0 0 0 3px rgba(46, 230, 200, 0.12);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
 }
 .input::placeholder {
-  color: var(--color-faint);
+  color: var(--muted);
+  opacity: 0.7;
 }
 
-/* LED de estado */
+/* Punto de estado: sólido, sin brillo ni parpadeo. */
 .led {
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   border-radius: 999px;
   flex: none;
 }
-.led-ok {
-  background: var(--color-ok);
-  box-shadow: 0 0 10px 2px rgba(52, 209, 126, 0.65);
-  animation: ledPulse 2.4s ease-in-out infinite;
-}
-.led-warn {
-  background: var(--color-warn);
-  box-shadow: 0 0 10px 2px rgba(242, 180, 76, 0.6);
-  animation: ledPulse 1.6s ease-in-out infinite;
-}
-.led-err {
-  background: var(--color-err);
-  box-shadow: 0 0 10px 2px rgba(255, 107, 107, 0.6);
-  animation: ledPulse 1s ease-in-out infinite;
-}
-.led-off {
-  background: #33424f;
-  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.6);
-}
-.led-aqua {
-  background: var(--color-aqua);
-  box-shadow: 0 0 12px 3px rgba(46, 230, 200, 0.7);
-  animation: ledPulse 2s ease-in-out infinite;
-}
+.led-ok { background: var(--primary); }
+.led-warn { background: var(--warn); }
+.led-err { background: var(--err); }
+.led-off { background: var(--line-strong); }
+.led-aqua { background: var(--primary); }
 
-/* LED grande del simulador */
+/* LED grande del simulador del ESP32 (/demo/device): imita la luz física, por eso brilla. */
 .led-big {
   width: 64px;
   height: 64px;
   border-radius: 999px;
-  border: 1px solid var(--color-line2);
-  background: #0d1620;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
   position: relative;
   flex: none;
 }
@@ -192,75 +244,88 @@ body {
   position: absolute;
   inset: 16px;
   border-radius: 999px;
-  background: #24323f;
+  background: var(--line-strong);
   transition: background 0.25s ease, box-shadow 0.25s ease;
 }
 .led-big-green .led-big-core {
-  background: var(--color-ok);
-  box-shadow: 0 0 30px 6px rgba(52, 209, 126, 0.8);
+  background: #22c55e;
+  box-shadow: 0 0 24px 4px rgba(34, 197, 94, 0.55);
 }
 .led-big-blink .led-big-core {
-  background: var(--color-ok);
+  background: #22c55e;
   animation: ledBlink 0.9s steps(1) infinite;
 }
 .led-big-red .led-big-core {
-  background: var(--color-err);
-  box-shadow: 0 0 30px 6px rgba(255, 107, 107, 0.8);
+  background: #ef4444;
+  box-shadow: 0 0 24px 4px rgba(239, 68, 68, 0.55);
   animation: ledBlink 0.5s steps(1) infinite;
 }
 
+/* Patentes: la única letra monoespaciada del cliente. */
+.plate {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+}
+
+/* Números (montos, contadores, horas): cifras de ancho fijo para que no bailen. */
+.num {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Carga: bloque suave que late, sin rayas ni escaneo. */
+.skeleton,
+.scan-zone {
+  background: var(--surface-2);
+  animation: softPulse 1.4s ease-in-out infinite;
+}
+
 /* ---------- animaciones ---------- */
-@keyframes ledPulse {
+@keyframes softPulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.55; }
+  50% { opacity: 0.6; }
 }
 @keyframes ledBlink {
-  0%, 100% { box-shadow: 0 0 30px 6px rgba(52, 209, 126, 0.8); }
-  50% { box-shadow: 0 0 6px 1px rgba(52, 209, 126, 0.2); }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
 }
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
-@keyframes scanline {
-  0% { background-position: 0 -40px; }
-  100% { background-position: 0 100%; }
-}
-@keyframes glowPulse {
-  0%, 100% { box-shadow: 0 0 24px -6px rgba(46, 230, 200, 0.5); }
-  50% { box-shadow: 0 0 40px -4px rgba(46, 230, 200, 0.85); }
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .fade-up {
-  animation: fadeUp 0.45s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  animation: fadeUp 0.3s cubic-bezier(0.2, 0.7, 0.3, 1) both;
 }
-
+/* Entrada escalonada: solo la primera vista de una lista, sutil. */
 .stagger > * {
-  animation: fadeUp 0.45s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  animation: fadeUp 0.3s cubic-bezier(0.2, 0.7, 0.3, 1) both;
 }
-.stagger > *:nth-child(1) { animation-delay: 0.02s; }
-.stagger > *:nth-child(2) { animation-delay: 0.08s; }
-.stagger > *:nth-child(3) { animation-delay: 0.14s; }
-.stagger > *:nth-child(4) { animation-delay: 0.2s; }
-.stagger > *:nth-child(5) { animation-delay: 0.26s; }
-.stagger > *:nth-child(6) { animation-delay: 0.32s; }
-.stagger > *:nth-child(7) { animation-delay: 0.38s; }
-.stagger > *:nth-child(8) { animation-delay: 0.44s; }
-.stagger > *:nth-child(9) { animation-delay: 0.5s; }
-.stagger > *:nth-child(10) { animation-delay: 0.56s; }
+.stagger > *:nth-child(2) { animation-delay: 0.04s; }
+.stagger > *:nth-child(3) { animation-delay: 0.08s; }
+.stagger > *:nth-child(4) { animation-delay: 0.12s; }
+.stagger > *:nth-child(5) { animation-delay: 0.16s; }
+.stagger > *:nth-child(n + 6) { animation-delay: 0.2s; }
 
-.scan-zone {
-  background-image: repeating-linear-gradient(0deg, rgba(46, 230, 200, 0.06) 0 1px, transparent 1px 6px);
-  animation: scanline 2.2s linear infinite;
-}
-
-.num {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
+.spinner {
+  width: 1.1em;
+  height: 1.1em;
+  border-radius: 999px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: spin 0.8s linear infinite;
 }
 
-/* scrollbar discreto */
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: #1d2a37; border-radius: 8px; border: 2px solid var(--color-carbon); }
-::-webkit-scrollbar-track { background: transparent; }
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
